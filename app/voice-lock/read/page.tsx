@@ -294,7 +294,9 @@ export default function VoiceLockRead() {
         <header className="sticky top-0 z-40" style={{ backgroundColor: '#FFFFFF', borderBottom: '1px solid #E5E7EB' }}>
           <div className="flex items-center justify-between px-4 h-14">
             <div className="w-8" /> {/* Spacer */}
-            <h1 className="text-sm font-medium text-[#111111]">VoiceLock Session</h1>
+            <h1 className="text-sm font-medium text-[#111111]">
+              {currentDataset?.name || "VoiceLock Session"}
+            </h1>
             <UserAvatar />
           </div>
         </header>
