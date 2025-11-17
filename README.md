@@ -1,36 +1,129 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# VoiceLock™ by Stream Disc
+
+A voice security system built with Next.js, TypeScript, and Firebase. This functional prototype demonstrates the VoiceLock concept with a clean architecture designed for AI integration in the next phase.
+
+## Features
+
+- **User Authentication**: Firebase Email/Password authentication
+- **VoiceLock Profile Setup**: Create and manage your voice profile
+- **Asset Verification**: Verify assets with VoiceLock scoring and serial generation
+- **Analytics Dashboard**: Track verifications and view detailed statistics
+- **Clean Architecture**: Structured for easy ML model integration
+
+## Tech Stack
+
+- **Frontend**: Next.js 14+ (App Router), TypeScript, Tailwind CSS
+- **Backend**: Firebase Firestore (via Admin SDK)
+- **Authentication**: Firebase Auth
+- **VoiceLock Engine**: Functional prototype engine with deterministic scoring for design and demo purposes
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
 
+- Node.js 18+
+- Firebase project with Firestore and Authentication enabled
+- Firebase Admin SDK service account key
+
+### Installation
+
+1. Clone the repository:
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone <repository-url>
+cd stream-disc-voice-lock
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2. Install dependencies:
+```bash
+npm install
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+3. Set up environment variables:
+```bash
+cp .env.local.example .env.local
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+4. Fill in your Firebase credentials in `.env.local`:
+   - Get your Firebase client config from Firebase Console > Project Settings > General
+   - Get your Admin SDK service account key from Firebase Console > Project Settings > Service Accounts
 
-## Learn More
+5. Run the development server:
+```bash
+npm run dev
+```
 
-To learn more about Next.js, take a look at the following resources:
+6. Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Firebase Setup
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. Create a new Firebase project at [Firebase Console](https://console.firebase.google.com/)
+2. Enable Authentication with Email/Password provider
+3. Enable Firestore Database
+4. Create a service account:
+   - Go to Project Settings > Service Accounts
+   - Click "Generate New Private Key"
+   - Save the JSON file and extract the values for `.env.local`
 
-## Deploy on Vercel
+## Project Structure
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```
+stream-disc-voice-lock/
+├── app/
+│   ├── api/
+│   │   └── voice-lock/
+│   │       ├── profile/route.ts
+│   │       ├── verify/route.ts
+│   │       └── verifications/route.ts
+│   ├── dashboard/
+│   │   └── page.tsx
+│   ├── voice-lock/
+│   │   ├── setup/page.tsx
+│   │   └── verify/page.tsx
+│   ├── layout.tsx
+│   ├── page.tsx
+│   └── globals.css
+├── components/
+│   ├── AuthGate.tsx
+│   ├── AuthModal.tsx
+│   ├── Navbar.tsx
+│   ├── StatsCards.tsx
+│   └── VerificationsTable.tsx
+├── contexts/
+│   └── AuthContext.tsx
+├── lib/
+│   ├── firebaseAdmin.ts
+│   ├── firebaseClient.ts
+│   ├── firestore.ts
+│   └── voiceLockEngine.ts
+└── types/
+    └── voiceLock.ts
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## VoiceLock Engine
+
+The current implementation is a functional prototype that generates deterministic scores based on `userId` and `assetId`. This phase focuses on function, design, and demonstration before moving to AI integration.
+
+**Next Phase - AI Integration:**
+1. Replace the `runVoiceLock` function in `lib/voiceLockEngine.ts`
+2. Call your ML service (e.g., Cloud Run, Vertex AI)
+3. Return the same `VoiceLockResult` type
+
+## Data Models
+
+### User Document
+- Collection: `users`
+- Document ID: Firebase Auth UID
+- Fields: `email`, `createdAt`, `updatedAt`
+
+### VoiceLock Profile
+- Collection: `users/{uid}/voiceLockProfile`
+- Document ID: `profile`
+- Fields: `voiceLockId`, `hasVoiceLock`, `samplesCount`, `calibrationLevel`, `createdAt`, `updatedAt`
+
+### VoiceLock Verification
+- Collection: `voiceLockVerifications`
+- Fields: `userId`, `assetId`, `similarityScore`, `grade`, `serial`, `createdAt`
+
+## License
+
+MIT
