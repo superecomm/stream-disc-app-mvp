@@ -85,8 +85,14 @@ export function RecordButton({
   const handleStart = async () => {
     try {
       // Request media with audio and optionally video
+      // Use 'ideal' instead of 'exact' to allow fallback if device unavailable
+      // Handle "default" as system default (use true)
+      const audioConstraint = audioDeviceId && audioDeviceId !== "default" 
+        ? { deviceId: { ideal: audioDeviceId } }
+        : true;
+      
       const constraints: MediaStreamConstraints = {
-        audio: audioDeviceId ? { deviceId: { exact: audioDeviceId } } : true,
+        audio: audioConstraint,
         video: recordVideo ? {
           facingMode: "user", // Front camera
           width: { ideal: 1280 },
@@ -94,10 +100,24 @@ export function RecordButton({
         } : false
       };
 
+      console.log("Requesting media with constraints:", { 
+        audioDeviceId, 
+        audioConstraint,
+        recordVideo 
+      });
+
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       
       // Separate audio and video tracks
       const audioTracks = stream.getAudioTracks();
+      
+      // Log which device was actually selected
+      if (audioTracks.length > 0) {
+        const actualDevice = audioTracks[0].getSettings().deviceId;
+        const actualLabel = audioTracks[0].label;
+        console.log("Audio device selected:", { deviceId: actualDevice, label: actualLabel });
+      }
+      
       const videoTracks = stream.getVideoTracks();
       
       // Create audio-only stream for audio recorder
@@ -217,8 +237,147 @@ export function RecordButton({
     } catch (error) {
       console.error("Error accessing media devices:", error);
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      
+      // If device-specific request failed, try with system default
+      if (audioDeviceId && audioDeviceId !== "default" && 
+          (errorMessage.includes("NotFoundError") || errorMessage.includes("NotReadableError"))) {
+        console.log("Device-specific request failed, trying with system default...");
+        try {
+          const fallbackConstraints: MediaStreamConstraints = {
+            audio: true, // Use system default
+            video: recordVideo ? {
+              facingMode: "user",
+              width: { ideal: 1280 },
+              height: { ideal: 720 }
+            } : false
+          };
+          
+          const fallbackStream = await navigator.mediaDevices.getUserMedia(fallbackConstraints);
+          const fallbackAudioTracks = fallbackStream.getAudioTracks();
+          const fallbackVideoTracks = fallbackStream.getVideoTracks();
+          
+          if (fallbackAudioTracks.length > 0) {
+            const actualDevice = fallbackAudioTracks[0].getSettings().deviceId;
+            const actualLabel = fallbackAudioTracks[0].label;
+            console.log("Fallback: Using system default device:", { deviceId: actualDevice, label: actualLabel });
+            
+            // Continue with fallback stream
+            const fallbackAudioStream = new MediaStream(fallbackAudioTracks);
+            setAudioStream(fallbackAudioStream);
+            
+            let fallbackVideoStream: MediaStream | null = null;
+            if (recordVideo && fallbackVideoTracks.length > 0) {
+              fallbackVideoStream = new MediaStream([...fallbackAudioTracks, ...fallbackVideoTracks]);
+              setVideoStream(fallbackVideoStream);
+              if (onStreamReady) {
+                onStreamReady(fallbackVideoStream);
+              }
+            } else {
+              if (onStreamReady) {
+                onStreamReady(fallbackAudioStream);
+              }
+            }
+            
+            const fallbackAudioRecorder = new MediaRecorder(fallbackAudioStream, {
+              mimeType: "audio/webm;codecs=opus"
+            });
+            mediaRecorderRef.current = fallbackAudioRecorder;
+            audioChunksRef.current = [];
+            
+            fallbackAudioRecorder.ondataavailable = (event) => {
+              if (event.data.size > 0) {
+                audioChunksRef.current.push(event.data);
+              }
+            };
+            
+            videoBlobRef.current = undefined;
+            audioBlobReadyRef.current = false;
+            videoBlobReadyRef.current = false;
+            
+            fallbackAudioRecorder.onstop = () => {
+              const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm;codecs=opus" });
+              audioBlobReadyRef.current = true;
+              
+              fallbackStream.getTracks().forEach((track) => track.stop());
+              setAudioStream(null);
+              if (fallbackVideoStream) {
+                setVideoStream(null);
+              }
+              if (onStreamReady) {
+                onStreamReady(null);
+              }
+              
+              if (recordVideo && videoRecorderRef.current) {
+                if (videoBlobReadyRef.current) {
+                  onStop(audioBlob, videoBlobRef.current);
+                  setState("processing");
+                  setTimeout(() => {
+                    setState("idle");
+                    setProgress(0);
+                    onComplete();
+                  }, 1500);
+                }
+              } else {
+                onStop(audioBlob);
+                setState("processing");
+                setTimeout(() => {
+                  setState("idle");
+                  setProgress(0);
+                  onComplete();
+                }, 1500);
+              }
+            };
+            
+            if (recordVideo && fallbackVideoStream) {
+              const fallbackVideoRecorder = new MediaRecorder(fallbackVideoStream, {
+                mimeType: "video/webm;codecs=vp8,opus"
+              });
+              videoRecorderRef.current = fallbackVideoRecorder;
+              videoChunksRef.current = [];
+              
+              fallbackVideoRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) {
+                  videoChunksRef.current.push(event.data);
+                }
+              };
+              
+              fallbackVideoRecorder.onstop = () => {
+                videoBlobRef.current = new Blob(videoChunksRef.current, { type: "video/webm;codecs=vp8,opus" });
+                videoBlobReadyRef.current = true;
+                
+                if (audioBlobReadyRef.current) {
+                  const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm;codecs=opus" });
+                  onStop(audioBlob, videoBlobRef.current);
+                  setState("processing");
+                  setTimeout(() => {
+                    setState("idle");
+                    setProgress(0);
+                    onComplete();
+                  }, 1500);
+                }
+              };
+              
+              fallbackVideoRecorder.start();
+            }
+            
+            fallbackAudioRecorder.start();
+            setState("recording");
+            setProgress(0);
+            onStart();
+            return; // Success with fallback
+          }
+        } catch (fallbackError) {
+          console.error("Fallback also failed:", fallbackError);
+          // Continue to show error message below
+        }
+      }
+      
       if (errorMessage.includes("permission") || errorMessage.includes("NotAllowedError")) {
         alert("Please allow microphone and camera access to record.");
+      } else if (errorMessage.includes("NotFoundError")) {
+        alert("Microphone not found. Please check your audio settings and try selecting a different device.");
+      } else if (errorMessage.includes("NotReadableError")) {
+        alert("Microphone is being used by another application. Please close other apps using the microphone and try again.");
       } else {
         alert(`Error accessing media: ${errorMessage}`);
       }
