@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { AuthGate } from "@/components/AuthGate";
 import { UserAvatar } from "@/components/UserAvatar";
@@ -14,13 +14,15 @@ import { TestModeCarousel } from "@/components/TestModeCarousel";
 import { VideoPreview } from "@/components/VideoPreview";
 import { OnboardingModal } from "@/components/OnboardingModal";
 import { CountdownModal } from "@/components/CountdownModal";
-import { readingPhrases, solfegePhrases, getPhrasesForDataset } from "@/lib/phrases";
+import { readingPhrases, solfegePhrases, getPhrasesForDataset, getDisplayItems } from "@/lib/phrases";
 import type { VoiceLockProfile, VoiceLockDataset } from "@/types/voiceLock";
 
 export default function VoiceLockRead() {
   const { currentUser } = useAuth();
   const [currentPhraseIndex, setCurrentPhraseIndex] = useState(0);
+  const [currentItemIndex, setCurrentItemIndex] = useState(0);
   const [isRecording, setIsRecording] = useState(false);
+  const [autoAdvanceEnabled, setAutoAdvanceEnabled] = useState(true);
   const [profile, setProfile] = useState<VoiceLockProfile | null>(null);
   const [currentDataset, setCurrentDataset] = useState<VoiceLockDataset | null>(null);
   const [showStatusModal, setShowStatusModal] = useState(false);
@@ -38,6 +40,8 @@ export default function VoiceLockRead() {
   const [showCountdown, setShowCountdown] = useState(false);
   const [pendingRecordingStart, setPendingRecordingStart] = useState(false);
   const phraseIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const autoAdvanceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const recordButtonRef = useRef<{ start: () => void } | null>(null);
 
   // Get phrases based on selected mode/test
   const currentPhrases = selectedMode === "solfege"
@@ -47,6 +51,24 @@ export default function VoiceLockRead() {
     : isFirstDataset
     ? solfegePhrases
     : readingPhrases;
+
+  // Determine if we're in Solfege mode
+  const isSolfege = testType === "solfege";
+  
+  // Get display items (words for scripts, single items for Solfege)
+  const displayItems = useMemo(() => {
+    return getDisplayItems(currentPhrases, isSolfege);
+  }, [currentPhrases, isSolfege]);
+
+  // Auto-advance timing configuration (in milliseconds)
+  const getAutoAdvanceDelay = () => {
+    if (testType === "solfege") {
+      return 2000; // 2 seconds for Solfege
+    } else if (testType === "script1" || testType === "script2" || testType === "script3") {
+      return 2000; // 2 seconds for scripts (configurable per mode)
+    }
+    return 2000; // Default 2 seconds
+  };
 
   // Update recording mode and test type based on selected mode
   useEffect(() => {
@@ -99,19 +121,76 @@ export default function VoiceLockRead() {
     }
   }, [recordingMode, isRecording]);
 
-  // Reset phrase index when phrases change (e.g., switching between onboarding and regular)
+  // Reset indices when phrases change (e.g., switching between onboarding and regular)
   useEffect(() => {
     if (!isRecording) {
       setCurrentPhraseIndex(0);
+      setCurrentItemIndex(0);
     }
   }, [isFirstDataset, testType, isRecording]);
 
-  // Manual phrase advancement - no auto-scrolling
-  const handleNextPhrase = () => {
-    if (isRecording && currentPhraseIndex < currentPhrases.length - 1) {
-      setCurrentPhraseIndex((prev) => prev + 1);
+  // Manual item advancement - cancels auto-advance
+  const handleNextItem = () => {
+    if (isRecording && currentItemIndex < displayItems.length - 1) {
+      // Cancel auto-advance timer if user manually advances
+      if (autoAdvanceTimerRef.current) {
+        clearTimeout(autoAdvanceTimerRef.current);
+        autoAdvanceTimerRef.current = null;
+      }
+      
+      setCurrentItemIndex((prev) => {
+        const nextIndex = prev + 1;
+        // Restart auto-advance timer if enabled (timer will restart via useEffect)
+        return nextIndex;
+      });
     }
   };
+
+  // Auto-advance timer function
+  const startAutoAdvanceTimer = () => {
+    if (autoAdvanceTimerRef.current) {
+      clearTimeout(autoAdvanceTimerRef.current);
+    }
+    
+    autoAdvanceTimerRef.current = setTimeout(() => {
+      setCurrentItemIndex((prev) => {
+        if (prev < displayItems.length - 1) {
+          const nextIndex = prev + 1;
+          // Trigger progress ring update via RecordButton's currentItemIndex prop
+          // Restart timer for next item if enabled
+          if (autoAdvanceEnabled && nextIndex < displayItems.length - 1) {
+            setTimeout(() => startAutoAdvanceTimer(), 50);
+          }
+          return nextIndex;
+        }
+        return prev;
+      });
+    }, getAutoAdvanceDelay());
+  };
+
+  // Start auto-advance when recording begins
+  useEffect(() => {
+    if (isRecording && autoAdvanceEnabled && displayItems.length > 0 && currentItemIndex < displayItems.length - 1) {
+      // Start timer for current item
+      startAutoAdvanceTimer();
+    } else {
+      // Clear timer when recording stops
+      if (autoAdvanceTimerRef.current) {
+        clearTimeout(autoAdvanceTimerRef.current);
+        autoAdvanceTimerRef.current = null;
+      }
+    }
+
+    return () => {
+      if (autoAdvanceTimerRef.current) {
+        clearTimeout(autoAdvanceTimerRef.current);
+        autoAdvanceTimerRef.current = null;
+      }
+    };
+  }, [isRecording, autoAdvanceEnabled, displayItems.length, currentItemIndex]);
+
+  // Legacy handleNextPhrase for backward compatibility (maps to handleNextItem)
+  const handleNextPhrase = handleNextItem;
 
   const fetchProfile = async () => {
     if (!currentUser) return;
@@ -200,17 +279,28 @@ export default function VoiceLockRead() {
       return;
     }
     
-    // Show countdown before starting
-    setPendingRecordingStart(true);
-    setShowCountdown(true);
+    // If countdown is pending, just show countdown
+    if (!pendingRecordingStart) {
+      setPendingRecordingStart(true);
+      setShowCountdown(true);
+      return;
+    }
+    
+    // After countdown, actually start recording
+    setIsRecording(true);
+    setCurrentPhraseIndex(0);
+    setCurrentItemIndex(0);
   };
+
+  const [triggerRecordStart, setTriggerRecordStart] = useState(false);
 
   const handleCountdownComplete = () => {
     setShowCountdown(false);
-    setIsRecording(true);
-    setCurrentPhraseIndex(0);
     setShowOnboarding(false);
     setPendingRecordingStart(false);
+    // Trigger the RecordButton to actually start recording
+    setTriggerRecordStart(true);
+    setTimeout(() => setTriggerRecordStart(false), 100);
   };
 
   const handleCountdownCancel = () => {
@@ -227,6 +317,7 @@ export default function VoiceLockRead() {
 
   const handleSessionComplete = () => {
     setCurrentPhraseIndex(0);
+    setCurrentItemIndex(0);
   };
 
   const saveSession = async (audioBlob: Blob, videoBlob?: Blob) => {
@@ -319,6 +410,8 @@ export default function VoiceLockRead() {
               currentIndex={currentPhraseIndex}
               isRecording={isRecording}
               onNextPhrase={handleNextPhrase}
+              mode={recordingMode}
+              testType={testType}
             />
           )}
         </main>
@@ -345,13 +438,20 @@ export default function VoiceLockRead() {
               {/* Center: Large Record Button */}
               <div className="flex-1 flex justify-center">
                 <RecordButton
-                  onStart={handleRecordingStart}
+                  onStart={() => {
+                    setIsRecording(true);
+                    setCurrentPhraseIndex(0);
+                    setCurrentItemIndex(0);
+                  }}
                   onStop={handleRecordingComplete}
                   onComplete={handleSessionComplete}
-                  disabled={showStatusModal}
+                  disabled={showStatusModal || showCountdown}
                   recordVideo={recordVideo}
                   audioDeviceId={selectedAudioDevice}
                   onStreamReady={setPreviewStream}
+                  totalItems={displayItems.length}
+                  currentItemIndex={currentItemIndex}
+                  triggerStart={triggerRecordStart}
                 />
               </div>
 

@@ -30,7 +30,7 @@ export function AudioSettings({ onDeviceChange, onVideoToggle, videoEnabled = fa
       const audioInputs = deviceList.filter(device => device.kind === "audioinput");
       setDevices(audioInputs);
 
-      // Try to get the default device
+      // Try to get the default device and auto-connect
       if (audioInputs.length > 0) {
         const defaultDevice = audioInputs.find(d => d.deviceId === "default") || audioInputs[0];
         setSelectedDevice(defaultDevice.deviceId);
@@ -63,6 +63,9 @@ export function AudioSettings({ onDeviceChange, onVideoToggle, videoEnabled = fa
     }
   };
 
+  // Check if no devices are available
+  const hasNoDevices = hasPermission !== false && devices.length === 0;
+
   return (
     <div className="relative">
       <button
@@ -73,10 +76,15 @@ export function AudioSettings({ onDeviceChange, onVideoToggle, videoEnabled = fa
             setIsOpen(!isOpen);
           }
         }}
-        className="w-10 h-10 rounded-full bg-[#F7F7F8] flex items-center justify-center hover:bg-[#E5E7EB] transition-colors border border-[#E5E7EB]"
+        className="w-10 h-10 rounded-full bg-[#F7F7F8] flex items-center justify-center hover:bg-[#E5E7EB] transition-colors border border-[#E5E7EB] relative"
         aria-label="Audio settings"
       >
         <Settings className="w-4 h-4 text-[#111111]" />
+        {hasNoDevices && (
+          <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+            !
+          </span>
+        )}
       </button>
 
       {/* Dropdown menu */}
@@ -117,7 +125,24 @@ export function AudioSettings({ onDeviceChange, onVideoToggle, videoEnabled = fa
             </div>
             <div className="p-2 border-t border-[#E5E7EB] space-y-2">
               <button
-                onClick={loadDevices}
+                onClick={async () => {
+                  try {
+                    // Request permission again to refresh device list
+                    await navigator.mediaDevices.getUserMedia({ audio: true });
+                    const deviceList = await navigator.mediaDevices.enumerateDevices();
+                    const audioInputs = deviceList.filter(device => device.kind === "audioinput");
+                    setDevices(audioInputs);
+                    
+                    // Auto-connect to first available device after refresh
+                    if (audioInputs.length > 0 && onDeviceChange) {
+                      const firstDevice = audioInputs[0];
+                      setSelectedDevice(firstDevice.deviceId);
+                      onDeviceChange(firstDevice.deviceId);
+                    }
+                  } catch (error) {
+                    console.error("Error refreshing devices:", error);
+                  }
+                }}
                 className="w-full text-xs text-slate-600 hover:text-[#111111] py-1"
               >
                 Refresh devices

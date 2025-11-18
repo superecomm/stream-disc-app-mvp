@@ -11,6 +11,7 @@ type SessionCompleteModalProps = {
   status: "not_started" | "mobile_enrolled" | "studio_verified";
   onClose: () => void;
   onNext: () => void;
+  testType?: string | null; // Test type: "solfege", "script1", "script2", "script3", or null
 };
 
 type ProcessingStep = {
@@ -25,6 +26,7 @@ export function SessionCompleteModal({
   status,
   onClose,
   onNext,
+  testType,
 }: SessionCompleteModalProps) {
   const [processingSteps, setProcessingSteps] = useState<ProcessingStep[]>([
     { label: "Saving audio sample…", completed: false },
@@ -60,6 +62,17 @@ export function SessionCompleteModal({
   }, [isOpen, currentStep]);
 
   if (!isOpen) return null;
+
+  // Get mode-specific completion message
+  const getCompletionMessage = () => {
+    if (testType === "solfege") {
+      return "Solfege Test Complete - Your voice sample has been added to your VoiceLock dataset.";
+    } else if (testType === "script1" || testType === "script2" || testType === "script3") {
+      return "Reading Session Complete - Your voice sample has been added to your VoiceLock dataset.";
+    } else {
+      return "Session Complete - Your voice sample has been added to your VoiceLock dataset.";
+    }
+  };
 
   const statusMessage =
     status === "mobile_enrolled"
@@ -99,7 +112,7 @@ export function SessionCompleteModal({
               <Check className="w-6 h-6 text-green-600" />
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-slate-900">Session saved</h3>
+              <h3 className="text-lg font-semibold text-slate-900">{getCompletionMessage()}</h3>
             </div>
           </div>
 

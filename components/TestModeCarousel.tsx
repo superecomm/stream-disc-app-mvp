@@ -19,10 +19,10 @@ type TestModeCarouselProps = {
 const testModes: TestMode[] = [
   { id: "voice", label: "Voice", icon: <Mic className="w-3 h-3" />, type: "mode" },
   { id: "video", label: "Video", icon: <Video className="w-3 h-3" />, type: "mode" },
-  { id: "solfege", label: "Solfege", icon: <Music className="w-3 h-3" />, type: "test", description: "Do Re Mi Fa So La Ti Do" },
-  { id: "script1", label: "Script 1", icon: <FileText className="w-3 h-3" />, type: "test", description: "Enrollment phrases" },
-  { id: "script2", label: "Script 2", icon: <FileText className="w-3 h-3" />, type: "test", description: "Enrollment phrases" },
-  { id: "script3", label: "Script 3", icon: <FileText className="w-3 h-3" />, type: "test", description: "Enrollment phrases" },
+  { id: "solfege", label: "Solfege", icon: <Music className="w-3 h-3" />, type: "test" },
+  { id: "script1", label: "Script 1", icon: <FileText className="w-3 h-3" />, type: "test" },
+  { id: "script2", label: "Script 2", icon: <FileText className="w-3 h-3" />, type: "test" },
+  { id: "script3", label: "Script 3", icon: <FileText className="w-3 h-3" />, type: "test" },
 ];
 
 export function TestModeCarousel({ currentMode, onModeChange }: TestModeCarouselProps) {
@@ -111,11 +111,6 @@ export function TestModeCarousel({ currentMode, onModeChange }: TestModeCarousel
                 <div className={`text-[10px] font-medium leading-tight ${isActive ? "text-white" : "text-[#111111]"}`}>
                   {mode.label}
                 </div>
-                {mode.description && isActive && (
-                  <div className="text-[8px] mt-0.5 text-white/70 leading-tight">
-                    {mode.description}
-                  </div>
-                )}
               </div>
             </button>
           );

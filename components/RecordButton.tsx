@@ -12,6 +12,9 @@ type RecordButtonProps = {
   recordVideo?: boolean; // Enable video recording
   audioDeviceId?: string; // Specific audio device to use
   onStreamReady?: (stream: MediaStream | null) => void; // Expose stream for preview
+  onItemComplete?: () => void; // Callback when an item is completed (for progress ring jump)
+  totalItems?: number; // Total number of items in the session (for dynamic progress calculation)
+  currentItemIndex?: number; // Current item index (for progress calculation)
 };
 
 export function RecordButton({ 
@@ -21,18 +24,30 @@ export function RecordButton({
   disabled,
   recordVideo = false,
   audioDeviceId,
-  onStreamReady
+  onStreamReady,
+  onItemComplete,
+  totalItems = 0,
+  currentItemIndex = 0,
+  triggerStart = false
 }: RecordButtonProps) {
   const [state, setState] = useState<"idle" | "recording" | "complete" | "processing">("idle");
   const [progress, setProgress] = useState(0);
+  
+  // Calculate progress based on items completed
+  useEffect(() => {
+    if (state === "recording" && totalItems > 0) {
+      // Dynamic progress: each item = 100 / totalItems %
+      const newProgress = (currentItemIndex / totalItems) * 100;
+      setProgress(Math.min(newProgress, 99)); // Cap at 99% for manual stop
+    }
+  }, [currentItemIndex, totalItems, state]);
+  
   const [audioStream, setAudioStream] = useState<MediaStream | null>(null);
   const [videoStream, setVideoStream] = useState<MediaStream | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const videoRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const videoChunksRef = useRef<Blob[]>([]);
-  const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const recordingStartTimeRef = useRef<number | null>(null);
   const videoBlobRef = useRef<Blob | undefined>(undefined);
   const audioBlobReadyRef = useRef(false);
   const videoBlobReadyRef = useRef(false);
@@ -51,33 +66,21 @@ export function RecordButton({
     }
   };
 
+  // Progress is now calculated based on items completed (handled in the useEffect above)
+  // Reset progress when recording stops
   useEffect(() => {
-    if (state === "recording") {
-      recordingStartTimeRef.current = Date.now();
-      // Update progress based on elapsed time (for visual feedback, max 5 minutes)
-      const maxDuration = 5 * 60 * 1000; // 5 minutes max
-      progressIntervalRef.current = setInterval(() => {
-        if (recordingStartTimeRef.current) {
-          const elapsed = Date.now() - recordingStartTimeRef.current;
-          const newProgress = Math.min((elapsed / maxDuration) * 100, 99); // Cap at 99% for manual stop
-          setProgress(newProgress);
-        }
-      }, 100);
-    } else {
-      if (progressIntervalRef.current) {
-        clearInterval(progressIntervalRef.current);
-        progressIntervalRef.current = null;
-      }
-      recordingStartTimeRef.current = null;
+    if (state === "idle" || state === "complete") {
+      setProgress(0);
     }
-
-    return () => {
-      if (progressIntervalRef.current) {
-        clearInterval(progressIntervalRef.current);
-      }
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state]);
+
+  // Handle external trigger to start recording
+  useEffect(() => {
+    if (triggerStart && state === "idle" && !disabled) {
+      handleStart();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [triggerStart, state, disabled]);
 
   const handleStart = async () => {
     try {
@@ -209,6 +212,7 @@ export function RecordButton({
       audioRecorder.start();
       setState("recording");
       setProgress(0);
+      // Call onStart callback to notify parent that recording has started
       onStart();
     } catch (error) {
       console.error("Error accessing media devices:", error);
@@ -308,9 +312,9 @@ export function RecordButton({
         ) : state === "complete" ? (
           <Check className="w-8 h-8 text-white" />
         ) : recordVideo ? (
-          <Video className={`w-8 h-8 ${state === "recording" ? "text-white" : "text-[#111111]"}`} />
+          <Video className={`w-8 h-8 ${state === "recording" ? "text-white animate-pulse-mic" : "text-[#111111]"}`} />
         ) : (
-          <Mic className={`w-8 h-8 ${state === "recording" ? "text-white" : "text-[#111111]"}`} />
+          <Mic className={`w-8 h-8 ${state === "recording" ? "text-white animate-pulse-mic" : "text-[#111111]"}`} />
         )}
       </button>
     </div>

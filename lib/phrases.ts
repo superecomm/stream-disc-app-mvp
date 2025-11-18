@@ -24,3 +24,22 @@ export function getPhrasesForDataset(isFirstDataset: boolean): string[] {
   }
   return readingPhrases;
 }
+
+// Split a phrase into words for word-by-word display (for reading phrases)
+export function splitPhraseIntoWords(phrase: string): string[] {
+  // Split by spaces and filter out empty strings
+  return phrase.split(/\s+/).filter(word => word.length > 0);
+}
+
+// Get all displayable items for a set of phrases
+// For Solfege: returns phrases as-is (single items)
+// For reading phrases: splits each phrase into words and flattens
+export function getDisplayItems(phrases: string[], isSolfege: boolean): string[] {
+  if (isSolfege) {
+    // Solfege phrases are already single items
+    return phrases;
+  } else {
+    // For reading phrases, split each phrase into words
+    return phrases.flatMap(phrase => splitPhraseIntoWords(phrase));
+  }
+}

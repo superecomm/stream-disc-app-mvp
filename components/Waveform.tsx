@@ -46,21 +46,25 @@ export function Waveform({ isRecording, audioStream }: WaveformProps) {
         analyserRef.current.getByteFrequencyData(dataArray);
       }
 
-      ctx.fillStyle = "#F7F7F8";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      // Clear with transparent background for ChatGPT-style waveform
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      const barWidth = 3;
-      const barGap = 2;
-      const barCount = 20;
+      const barWidth = 2;
+      const barGap = 1.5;
+      const barCount = 24;
       const centerY = canvas.height / 2;
+      const maxBarHeight = canvas.height * 0.8;
 
       for (let i = 0; i < barCount; i++) {
         const dataIndex = Math.floor((i / barCount) * dataArray.length);
-        const barHeight = (dataArray[dataIndex] / 255) * 30;
+        // More responsive: use average of nearby frequencies for smoother visualization
+        const avgValue = dataArray[dataIndex] || 0;
+        const barHeight = Math.max(2, (avgValue / 255) * maxBarHeight);
         
         const x = (canvas.width / 2) - (barCount * (barWidth + barGap)) / 2 + i * (barWidth + barGap);
         
-        ctx.fillStyle = "#111111";
+        // ChatGPT-style: white bars on red background (when recording)
+        ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
         ctx.fillRect(x, centerY - barHeight / 2, barWidth, barHeight);
       }
     };
