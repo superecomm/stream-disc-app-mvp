@@ -13,6 +13,8 @@ export async function POST(request: NextRequest) {
     const studioId = formData.get("studioId") as string | null;
     const studioName = formData.get("studioName") as string | null;
     const vocalType = (formData.get("vocalType") as "speech" | "singing" | "rapping" | "other") || "speech";
+    const transcript = formData.get("transcript") as string | null;
+    const chatMessages = formData.get("chatMessages") as string | null; // JSON string of chat messages
 
     if (!userId || !phrasesCount) {
       return NextResponse.json(
@@ -40,6 +42,16 @@ export async function POST(request: NextRequest) {
     const activeDataset = await getActiveDataset(userId);
 
     if (activeDataset) {
+      // Parse chat messages if provided
+      let parsedChatMessages = undefined;
+      if (chatMessages) {
+        try {
+          parsedChatMessages = JSON.parse(chatMessages);
+        } catch (e) {
+          console.error("Error parsing chatMessages:", e);
+        }
+      }
+
       // Use dataset-based session
       const { session, dataset } = await addVoiceLockSessionToDataset(
         userId,
@@ -51,6 +63,8 @@ export async function POST(request: NextRequest) {
           studioName: studioName || undefined,
           vocalType: vocalType,
           verified: source === "studio" ? false : undefined, // Studio sessions need verification
+          transcript: transcript || undefined,
+          chatMessages: parsedChatMessages || undefined,
         }
       );
 

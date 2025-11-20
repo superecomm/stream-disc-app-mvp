@@ -183,6 +183,13 @@ export function UserAvatar() {
               >
                 Reading Session
               </Link>
+              <Link
+                href="/voice-lock/sessions"
+                onClick={() => setIsOpen(false)}
+                className="block px-4 py-2 text-slate-700 hover:bg-slate-100 rounded-md transition-colors"
+              >
+                Chat Sessions
+              </Link>
             </div>
 
             {/* Datasets Section - ChatGPT style */}

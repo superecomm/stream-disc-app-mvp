@@ -42,6 +42,9 @@ export default function VoiceLockRead() {
   const phraseIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const autoAdvanceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const recordButtonRef = useRef<{ start: () => void } | null>(null);
+  const voiceModeTranscriptsRef = useRef<Array<{ transcript: string; audioBlob: Blob }>>([]);
+  const voiceModeCombinedAudioRef = useRef<Blob | null>(null);
+  const voiceModeChatMessagesRef = useRef<Array<{ id: string; transcript: string; timestamp: Date; audioBlob?: Blob }>>([]);
 
   // Get phrases based on selected mode/test
   const currentPhrases = selectedMode === "solfege"
@@ -308,11 +311,66 @@ export default function VoiceLockRead() {
     setPendingRecordingStart(false);
   };
 
+  const handleTranscriptComplete = (transcript: string, audioBlob: Blob) => {
+    // Store transcript and audio for voice mode
+    if (recordingMode === "voice" && !testType) {
+      voiceModeTranscriptsRef.current.push({ transcript, audioBlob });
+      // Also store as chat message
+      voiceModeChatMessagesRef.current.push({
+        id: `msg_${Date.now()}`,
+        transcript,
+        timestamp: new Date(),
+        audioBlob,
+      });
+    }
+  };
+
   const handleRecordingComplete = async (audioBlob: Blob, videoBlob?: Blob) => {
     setIsRecording(false);
     setPreviewStream(null); // Clear preview stream when recording stops
-    setShowStatusModal(true);
-    await saveSession(audioBlob, videoBlob);
+    
+    // For voice mode, combine all transcripts and audio blobs
+    if (recordingMode === "voice" && !testType && voiceModeTranscriptsRef.current.length > 0) {
+      const combinedTranscript = voiceModeTranscriptsRef.current
+        .map((item) => item.transcript)
+        .join(" ");
+      
+      // Combine all audio blobs
+      const audioBlobs = voiceModeTranscriptsRef.current.map((item) => item.audioBlob);
+      const combinedAudioBlob = await combineAudioBlobs(audioBlobs);
+      
+      // Prepare chat messages for saving (without audio blobs, just metadata)
+      const chatMessagesForSave = voiceModeChatMessagesRef.current.map((msg) => ({
+        id: msg.id,
+        transcript: msg.transcript,
+        timestamp: msg.timestamp.toISOString(),
+      }));
+      
+      voiceModeCombinedAudioRef.current = combinedAudioBlob;
+      setShowStatusModal(true);
+      await saveSession(combinedAudioBlob, videoBlob, combinedTranscript, chatMessagesForSave);
+      
+      // Reset for next recording
+      voiceModeTranscriptsRef.current = [];
+      voiceModeCombinedAudioRef.current = null;
+      voiceModeChatMessagesRef.current = [];
+    } else {
+      setShowStatusModal(true);
+      await saveSession(audioBlob, videoBlob);
+    }
+  };
+
+  const combineAudioBlobs = async (blobs: Blob[]): Promise<Blob> => {
+    // For now, just use the first blob or combine them
+    // In a production app, you'd want to properly concatenate audio files
+    if (blobs.length === 1) {
+      return blobs[0];
+    }
+    
+    // Combine multiple blobs by creating a new blob
+    // Note: This is a simple approach - for proper audio concatenation,
+    // you'd need to decode, concatenate, and re-encode the audio
+    return new Blob(blobs, { type: "audio/webm;codecs=opus" });
   };
 
   const handleSessionComplete = () => {
@@ -320,7 +378,7 @@ export default function VoiceLockRead() {
     setCurrentItemIndex(0);
   };
 
-  const saveSession = async (audioBlob: Blob, videoBlob?: Blob) => {
+  const saveSession = async (audioBlob: Blob, videoBlob?: Blob, transcript?: string, chatMessages?: Array<{ id: string; transcript: string; timestamp: string }>) => {
     if (!currentUser) return;
 
     try {
@@ -340,6 +398,16 @@ export default function VoiceLockRead() {
       formData.append("source", "mobile");
       formData.append("vocalType", "speech"); // Default to speech, can be changed later
       formData.append("hasVideo", videoBlob ? "true" : "false");
+      
+      // Add transcript if available (for voice mode)
+      if (transcript) {
+        formData.append("transcript", transcript);
+      }
+      
+      // Add chat messages if available (for voice mode)
+      if (chatMessages && chatMessages.length > 0) {
+        formData.append("chatMessages", JSON.stringify(chatMessages));
+      }
 
       const response = await fetch("/api/voice-lock/session", {
         method: "POST",
@@ -412,6 +480,8 @@ export default function VoiceLockRead() {
               onNextPhrase={handleNextPhrase}
               mode={recordingMode}
               testType={testType}
+              audioStream={previewStream}
+              onTranscriptComplete={handleTranscriptComplete}
             />
           )}
         </main>

@@ -21,6 +21,13 @@ export type VoiceLockProfile = {
   calibrationLevel?: number;
 };
 
+export type ChatMessage = {
+  id: string;
+  transcript: string;
+  timestamp: string; // ISO string
+  audioBlobUrl?: string; // URL to audio file if stored
+};
+
 export type VoiceLockSession = {
   userId: string;
   sessionId: string;
@@ -33,6 +40,8 @@ export type VoiceLockSession = {
   studioName?: string; // Studio name (if studio session)
   vocalType?: "speech" | "singing" | "rapping" | "other"; // Type of vocal sample
   verified?: boolean; // Whether studio has verified this session
+  transcript?: string; // Full transcript text
+  chatMessages?: ChatMessage[]; // Array of chat messages for voice mode
 };
 
 export type VoiceLockDataset = {

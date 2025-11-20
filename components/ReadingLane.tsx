@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { getDisplayItems } from "@/lib/phrases";
+import { VoiceTranscription } from "./VoiceTranscription";
 
 type ReadingLaneProps = {
   phrases: string[];
@@ -10,14 +11,24 @@ type ReadingLaneProps = {
   onNextPhrase?: () => void; // Manual advancement callback
   mode?: string; // Current mode: "voice", "video", "solfege", "script1", "script2", "script3"
   testType?: string | null; // Test type: "solfege", "script1", "script2", "script3", or null
+  audioStream?: MediaStream | null; // Audio stream for transcription
+  onTranscriptComplete?: (transcript: string, audioBlob: Blob) => void; // Callback when transcript is complete
 };
 
-export function ReadingLane({ phrases, currentIndex, isRecording, onNextPhrase, mode, testType }: ReadingLaneProps) {
+export function ReadingLane({ phrases, currentIndex, isRecording, onNextPhrase, mode, testType, audioStream, onTranscriptComplete }: ReadingLaneProps) {
   const [displayIndex, setDisplayIndex] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
 
   // Determine if we're in Solfege mode
   const isSolfege = testType === "solfege";
+  
+  // Check if we're in pure voice mode (voice mode without any test type)
+  const isPureVoiceMode = mode === "voice" && !testType;
+  
+  // If in pure voice mode, show transcription instead of reading prompts
+  if (isPureVoiceMode) {
+    return <VoiceTranscription audioStream={audioStream || null} isRecording={isRecording} onTranscriptComplete={onTranscriptComplete} />;
+  }
   
   // Get display items (words for scripts, single items for Solfege)
   const displayItems = useMemo(() => {

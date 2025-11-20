@@ -399,6 +399,8 @@ export async function addVoiceLockSessionToDataset(
     studioName?: string;
     vocalType?: "speech" | "singing" | "rapping" | "other";
     verified?: boolean;
+    transcript?: string;
+    chatMessages?: any[]; // ChatMessage[] from types
   }
 ): Promise<{ session: VoiceLockSession; dataset: VoiceLockDataset }> {
   const adminFirestore = getAdminFirestore();
@@ -417,6 +419,8 @@ export async function addVoiceLockSessionToDataset(
     studioName: options?.studioName,
     vocalType: options?.vocalType || "speech",
     verified: options?.verified || false,
+    transcript: options?.transcript,
+    chatMessages: options?.chatMessages,
   };
 
   await adminFirestore.collection("voiceLockSessions").add(session);
