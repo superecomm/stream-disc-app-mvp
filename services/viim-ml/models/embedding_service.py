@@ -17,16 +17,26 @@ class VoiceprintService:
     """
     
     def __init__(self):
-        """Initialize the ECAPA-TDNN model from Hugging Face."""
-        try:
-            logger.info("Loading ECAPA-TDNN model from Hugging Face...")
-            self.model = EncoderClassifier.from_hf_source(
-                "speechbrain/spkrec-ecapa-voxceleb"
-            )
-            logger.info("Model loaded successfully")
-        except Exception as e:
-            logger.error(f"Failed to load model: {str(e)}")
-            raise
+        """Initialize the service. Model loads lazily on first use."""
+        self.model: Optional[EncoderClassifier] = None
+        self._model_loading = False
+        logger.info("VoiceprintService initialized (model will load on first request)")
+    
+    def _load_model(self):
+        """Load the model if not already loaded (lazy loading)."""
+        if self.model is None and not self._model_loading:
+            try:
+                self._model_loading = True
+                logger.info("Loading ECAPA-TDNN model from Hugging Face (first request)...")
+                self.model = EncoderClassifier.from_hf_source(
+                    "speechbrain/spkrec-ecapa-voxceleb"
+                )
+                logger.info("Model loaded successfully")
+                self._model_loading = False
+            except Exception as e:
+                self._model_loading = False
+                logger.error(f"Failed to load model: {str(e)}")
+                raise
     
     def extract_embedding(self, audio: np.ndarray) -> np.ndarray:
         """
@@ -38,6 +48,9 @@ class VoiceprintService:
         Returns:
             192-dimensional embedding vector
         """
+        # Load model on first request (lazy loading)
+        self._load_model()
+        
         try:
             # Model expects shape: (batch, samples) or (samples,)
             # Add batch dimension if needed

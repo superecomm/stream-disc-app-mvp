@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
     const audioFile = formData.get("audio") as File;
-    const userId = formData.get("userId") as string;
+    let userId = formData.get("userId") as string;
 
     if (!audioFile) {
       return NextResponse.json(
@@ -20,11 +20,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Make userId optional - generate temp ID for testing
     if (!userId) {
-      return NextResponse.json(
-        { error: "Missing userId" },
-        { status: 400 }
-      );
+      userId = `temp_user_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+      console.log(`Generated temporary userId for testing: ${userId}`);
     }
 
     // Convert File to Blob
