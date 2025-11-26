@@ -6,11 +6,11 @@ import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
 import { NewDatasetModal } from "@/components/NewDatasetModal";
-import type { VoiceLockDataset } from "@/types/voiceLock";
+import type { ViimDataset } from "@/types/viim";
 
 export function HamburgerMenu() {
   const [isOpen, setIsOpen] = useState(false);
-  const [datasets, setDatasets] = useState<VoiceLockDataset[]>([]);
+  const [datasets, setDatasets] = useState<ViimDataset[]>([]);
   const [showNewDatasetModal, setShowNewDatasetModal] = useState(false);
   const { currentUser, logout } = useAuth();
   const router = useRouter();
@@ -25,7 +25,7 @@ export function HamburgerMenu() {
     if (!currentUser) return;
 
     try {
-      const response = await fetch(`/api/voice-lock/datasets?userId=${currentUser.uid}`);
+      const response = await fetch(`/api/viim/datasets?userId=${currentUser.uid}`);
       if (response.ok) {
         const data = await response.json();
         setDatasets(data.datasets || []);
@@ -39,7 +39,7 @@ export function HamburgerMenu() {
     if (!currentUser) return;
 
     try {
-      const response = await fetch("/api/voice-lock/datasets", {
+      const response = await fetch("/api/viim/datasets", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -64,7 +64,7 @@ export function HamburgerMenu() {
     if (!currentUser) return;
 
     try {
-      const response = await fetch("/api/voice-lock/datasets/switch", {
+      const response = await fetch("/api/viim/datasets/switch", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -141,21 +141,21 @@ export function HamburgerMenu() {
                 Dashboard
               </Link>
               <Link
-                href="/voice-lock/setup"
+                href="/viim/setup"
                 onClick={() => setIsOpen(false)}
                 className="block px-4 py-2 text-slate-700 hover:bg-slate-100 rounded-md transition-colors"
               >
                 Setup
               </Link>
               <Link
-                href="/voice-lock/verify"
+                href="/viim/verify"
                 onClick={() => setIsOpen(false)}
                 className="block px-4 py-2 text-slate-700 hover:bg-slate-100 rounded-md transition-colors"
               >
                 Verify
               </Link>
               <Link
-                href="/voice-lock/read"
+                href="/viim/read"
                 onClick={() => setIsOpen(false)}
                 className="block px-4 py-2 text-slate-700 hover:bg-slate-100 rounded-md transition-colors"
               >

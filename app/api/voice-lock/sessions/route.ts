@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAdminFirestore } from "@/lib/firestore";
+import { getAdminFirestore } from "@/lib/firebaseAdmin";
 import type { VoiceLockSession } from "@/types/voiceLock";
 
 export async function GET(request: NextRequest) {

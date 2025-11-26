@@ -15,6 +15,7 @@ type RecordButtonProps = {
   onItemComplete?: () => void; // Callback when an item is completed (for progress ring jump)
   totalItems?: number; // Total number of items in the session (for dynamic progress calculation)
   currentItemIndex?: number; // Current item index (for progress calculation)
+  triggerStart?: boolean; // External trigger to start recording
 };
 
 export function RecordButton({ 

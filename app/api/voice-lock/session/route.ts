@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { addVoiceLockSession, addVoiceLockSessionToDataset, getActiveDataset } from "@/lib/firestore";
+import { addViimSession, addViimSessionToDataset, getActiveDataset } from "@/lib/firestore";
 
 export async function POST(request: NextRequest) {
   try {
@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Use dataset-based session
-      const { session, dataset } = await addVoiceLockSessionToDataset(
+      const { session, dataset } = await addViimSessionToDataset(
         userId,
         activeDataset.datasetId,
         phrasesCount,
@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
       });
     } else {
       // Fallback to legacy profile-based session
-      const { session, profile } = await addVoiceLockSession(userId, phrasesCount, source);
+      const { session, profile } = await addViimSession(userId, phrasesCount, source);
 
       return NextResponse.json({
         sessionId: session.sessionId,

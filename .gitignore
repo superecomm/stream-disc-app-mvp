@@ -32,6 +32,31 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+.env.local
+.env.production
+.env.development
+
+# Firebase
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+*.db
+voiceprints.db
+
+# ML Service
+services/viim-ml/__pycache__/
+services/viim-ml/*.db
 
 # vercel
 .vercel

@@ -66,11 +66,11 @@ export function SessionCompleteModal({
   // Get mode-specific completion message
   const getCompletionMessage = () => {
     if (testType === "solfege") {
-      return "Solfege Test Complete - Your voice sample has been added to your VoiceLock dataset.";
+      return "Solfege Test Complete - Your voice sample has been added to your VIIM dataset.";
     } else if (testType === "script1" || testType === "script2" || testType === "script3") {
-      return "Reading Session Complete - Your voice sample has been added to your VoiceLock dataset.";
+      return "Reading Session Complete - Your voice sample has been added to your VIIM dataset.";
     } else {
-      return "Session Complete - Your voice sample has been added to your VoiceLock dataset.";
+      return "Session Complete - Your voice sample has been added to your VIIM dataset.";
     }
   };
 

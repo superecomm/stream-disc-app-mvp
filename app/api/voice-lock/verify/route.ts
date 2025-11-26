@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { runVoiceLock } from "@/lib/voiceLockEngine";
-import { createVoiceLockVerification, getVoiceLockProfile } from "@/lib/firestore";
+import { createViimVerification, getViimProfile } from "@/lib/firestore";
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Optional: Check if user has a VoiceLock profile
-    const profile = await getVoiceLockProfile(userId);
+    const profile = await getViimProfile(userId);
     if (!profile) {
       return NextResponse.json(
         { error: "VoiceLock profile not found. Please set up your profile first." },
@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
     }
 
     const result = runVoiceLock(userId, assetId);
-    const verificationId = await createVoiceLockVerification(
+    const verificationId = await createViimVerification(
       userId,
       assetId,
       result

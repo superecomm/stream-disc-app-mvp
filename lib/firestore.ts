@@ -1,6 +1,7 @@
 import { getAdminFirestore } from "./firebaseAdmin";
-import type { VoiceLockProfile, VoiceLockVerification, VoiceLockSession, VoiceLockDataset, UserDoc } from "@/types/voiceLock";
+import type { ViimProfile, ViimVerification, ViimSession, ViimDataset, UserDoc, Voiceprint, VoiceprintSample } from "@/types/viim";
 import { Timestamp } from "firebase-admin/firestore";
+import { averageEmbeddings } from "./voiceprintUtils";
 
 export async function getUserDoc(userId: string): Promise<UserDoc | null> {
   const adminFirestore = getAdminFirestore();
@@ -35,32 +36,32 @@ export async function createOrUpdateUserDoc(
   }
 }
 
-export async function getVoiceLockProfile(
+export async function getViimProfile(
   userId: string
-): Promise<VoiceLockProfile | null> {
+): Promise<ViimProfile | null> {
   const adminFirestore = getAdminFirestore();
   const doc = await adminFirestore
     .collection("users")
     .doc(userId)
-    .collection("voiceLockProfile")
+    .collection("viimProfile")
     .doc("profile")
     .get();
   
   if (!doc.exists) {
     return null;
   }
-  return doc.data() as VoiceLockProfile;
+  return doc.data() as ViimProfile;
 }
 
-export async function createOrUpdateVoiceLockProfile(
+export async function createOrUpdateViimProfile(
   userId: string,
   samplesCount: number
-): Promise<VoiceLockProfile> {
+): Promise<ViimProfile> {
   const adminFirestore = getAdminFirestore();
   const profileRef = adminFirestore
     .collection("users")
     .doc(userId)
-    .collection("voiceLockProfile")
+    .collection("viimProfile")
     .doc("profile");
   
   const existingProfile = await profileRef.get();
@@ -68,7 +69,7 @@ export async function createOrUpdateVoiceLockProfile(
   const calibrationLevel = Math.min(samplesCount * 20, 100);
 
   if (existingProfile.exists) {
-    const existing = existingProfile.data() as VoiceLockProfile;
+    const existing = existingProfile.data() as ViimProfile;
     // Preserve new fields if they exist, otherwise use legacy fields
     const mobileSamples = existing.mobileSamples !== undefined ? existing.mobileSamples : samplesCount;
     const studioSamples = existing.studioSamples || 0;
@@ -78,9 +79,9 @@ export async function createOrUpdateVoiceLockProfile(
       : calculateDatasetCompletion(mobileSamples, studioSamples, studioVerified);
     const status = existing.status || determineStatus(mobileSamples, studioSamples, studioVerified);
     
-    const updated: VoiceLockProfile = {
+    const updated: ViimProfile = {
       ...existing,
-      voiceLockId: existing.voiceLockId || `VL-ARTIST-${Date.now().toString().slice(-6)}`,
+      viimId: existing.viimId || `VL-ARTIST-${Date.now().toString().slice(-6)}`,
       status,
       mobileSamples,
       studioSamples,
@@ -93,13 +94,13 @@ export async function createOrUpdateVoiceLockProfile(
     await profileRef.update(updated);
     return updated;
   } else {
-    const voiceLockId = `VL-ARTIST-${Date.now().toString().slice(-6)}`;
+    const viimId = `VIIM-ARTIST-${Date.now().toString().slice(-6)}`;
     const mobileSamples = samplesCount;
     const datasetCompletion = calculateDatasetCompletion(mobileSamples, 0, false);
     const status = determineStatus(mobileSamples, 0, false);
     
-    const newProfile: VoiceLockProfile = {
-      voiceLockId,
+    const newProfile: ViimProfile = {
+      viimId,
       status,
       mobileSamples,
       studioSamples: 0,
@@ -140,17 +141,17 @@ function determineStatus(
   return "not_started";
 }
 
-export async function addVoiceLockSession(
+export async function addViimSession(
   userId: string,
   phrasesCount: number,
   source: "mobile" | "studio"
-): Promise<{ session: VoiceLockSession; profile: VoiceLockProfile }> {
+): Promise<{ session: ViimSession; profile: ViimProfile }> {
   const adminFirestore = getAdminFirestore();
   const now = Timestamp.now();
   const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
   // Create session
-  const session: VoiceLockSession = {
+  const session: ViimSession = {
     userId,
     sessionId,
     phrasesCount,
@@ -158,19 +159,19 @@ export async function addVoiceLockSession(
     source,
   };
 
-  await adminFirestore.collection("voiceLockSessions").add(session);
+  await adminFirestore.collection("viimSessions").add(session);
 
   // Update profile
   const profileRef = adminFirestore
     .collection("users")
     .doc(userId)
-    .collection("voiceLockProfile")
+    .collection("viimProfile")
     .doc("profile");
 
   const existingProfile = await profileRef.get();
 
   if (existingProfile.exists) {
-    const existing = existingProfile.data() as VoiceLockProfile;
+    const existing = existingProfile.data() as ViimProfile;
     const mobileSamples = source === "mobile" 
       ? (existing.mobileSamples || 0) + 1 
       : (existing.mobileSamples || 0);
@@ -182,9 +183,9 @@ export async function addVoiceLockSession(
     const datasetCompletion = calculateDatasetCompletion(mobileSamples, studioSamples, studioVerified);
     const status = determineStatus(mobileSamples, studioSamples, studioVerified);
 
-    const updated: VoiceLockProfile = {
+    const updated: ViimProfile = {
       ...existing,
-      voiceLockId: existing.voiceLockId || `VL-ARTIST-${Date.now().toString().slice(-6)}`,
+      viimId: existing.viimId || `VL-ARTIST-${Date.now().toString().slice(-6)}`,
       status,
       mobileSamples,
       studioSamples,
@@ -197,14 +198,14 @@ export async function addVoiceLockSession(
     return { session, profile: updated };
   } else {
     // Create new profile
-    const voiceLockId = `VL-ARTIST-${Date.now().toString().slice(-6)}`;
+    const viimId = `VL-ARTIST-${Date.now().toString().slice(-6)}`;
     const mobileSamples = source === "mobile" ? 1 : 0;
     const studioSamples = source === "studio" ? 1 : 0;
     const datasetCompletion = calculateDatasetCompletion(mobileSamples, studioSamples, false);
     const status = determineStatus(mobileSamples, studioSamples, false);
 
-    const newProfile: VoiceLockProfile = {
-      voiceLockId,
+    const newProfile: ViimProfile = {
+      viimId,
       status,
       mobileSamples,
       studioSamples,
@@ -219,13 +220,13 @@ export async function addVoiceLockSession(
   }
 }
 
-export async function createVoiceLockVerification(
+export async function createViimVerification(
   userId: string,
   assetId: string,
   result: { similarityScore: number; grade: "A" | "B" | "C" | "D"; serial: string }
 ): Promise<string> {
   const adminFirestore = getAdminFirestore();
-  const verification: VoiceLockVerification = {
+  const verification: ViimVerification = {
     userId,
     assetId,
     similarityScore: result.similarityScore,
@@ -235,21 +236,21 @@ export async function createVoiceLockVerification(
   };
 
   const docRef = await adminFirestore
-    .collection("voiceLockVerifications")
+    .collection("viimVerifications")
     .add(verification);
   
   return docRef.id;
 }
 
-export async function getUserVerifications(userId: string): Promise<VoiceLockVerification[]> {
+export async function getUserVerifications(userId: string): Promise<ViimVerification[]> {
   const adminFirestore = getAdminFirestore();
   const snapshot = await adminFirestore
-    .collection("voiceLockVerifications")
+    .collection("viimVerifications")
     .where("userId", "==", userId)
     .orderBy("createdAt", "desc")
     .get();
   
-  return snapshot.docs.map((doc) => doc.data() as VoiceLockVerification);
+  return snapshot.docs.map((doc) => doc.data() as ViimVerification);
 }
 
 export async function getVerificationStats(userId: string): Promise<{
@@ -269,14 +270,14 @@ export async function getVerificationStats(userId: string): Promise<{
 export async function createDataset(
   userId: string,
   name: string
-): Promise<VoiceLockDataset> {
+): Promise<ViimDataset> {
   const adminFirestore = getAdminFirestore();
   const now = Timestamp.now();
   const datasetId = `dataset_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
   // Deactivate all other datasets for this user
   const existingDatasets = await adminFirestore
-    .collection("voiceLockDatasets")
+    .collection("viimDatasets")
     .where("userId", "==", userId)
     .get();
 
@@ -286,7 +287,7 @@ export async function createDataset(
   });
 
   // Create new dataset
-  const newDataset: VoiceLockDataset = {
+  const newDataset: ViimDataset = {
     userId,
     datasetId,
     name,
@@ -300,7 +301,7 @@ export async function createDataset(
     isActive: true,
   };
 
-  const datasetRef = adminFirestore.collection("voiceLockDatasets").doc();
+  const datasetRef = adminFirestore.collection("viimDatasets").doc();
   batch.set(datasetRef, newDataset);
   await batch.commit();
 
@@ -309,13 +310,13 @@ export async function createDataset(
   if (!createdDoc.exists) {
     throw new Error("Failed to create dataset");
   }
-  return createdDoc.data() as VoiceLockDataset;
+  return createdDoc.data() as ViimDataset;
 }
 
-export async function getActiveDataset(userId: string): Promise<VoiceLockDataset | null> {
+export async function getActiveDataset(userId: string): Promise<ViimDataset | null> {
   const adminFirestore = getAdminFirestore();
   const snapshot = await adminFirestore
-    .collection("voiceLockDatasets")
+    .collection("viimDatasets")
     .where("userId", "==", userId)
     .where("isActive", "==", true)
     .limit(1)
@@ -325,18 +326,18 @@ export async function getActiveDataset(userId: string): Promise<VoiceLockDataset
     return null;
   }
 
-  return snapshot.docs[0].data() as VoiceLockDataset;
+  return snapshot.docs[0].data() as ViimDataset;
 }
 
-export async function getUserDatasets(userId: string): Promise<VoiceLockDataset[]> {
+export async function getUserDatasets(userId: string): Promise<ViimDataset[]> {
   const adminFirestore = getAdminFirestore();
   // Get all datasets and sort in memory to avoid index requirement
   const snapshot = await adminFirestore
-    .collection("voiceLockDatasets")
+    .collection("viimDatasets")
     .where("userId", "==", userId)
     .get();
 
-  const datasets = snapshot.docs.map((doc) => doc.data() as VoiceLockDataset);
+  const datasets = snapshot.docs.map((doc) => doc.data() as ViimDataset);
   // Sort by updatedAt descending
   datasets.sort((a, b) => {
     const aTime = a.updatedAt.toMillis();
@@ -350,12 +351,12 @@ export async function getUserDatasets(userId: string): Promise<VoiceLockDataset[
 export async function switchActiveDataset(
   userId: string,
   datasetId: string
-): Promise<VoiceLockDataset> {
+): Promise<ViimDataset> {
   const adminFirestore = getAdminFirestore();
 
   // Deactivate all datasets
   const allDatasets = await adminFirestore
-    .collection("voiceLockDatasets")
+    .collection("viimDatasets")
     .where("userId", "==", userId)
     .get();
 
@@ -366,7 +367,7 @@ export async function switchActiveDataset(
 
   // Activate the selected dataset
   const targetDataset = await adminFirestore
-    .collection("voiceLockDatasets")
+    .collection("viimDatasets")
     .where("userId", "==", userId)
     .where("datasetId", "==", datasetId)
     .limit(1)
@@ -389,7 +390,7 @@ export async function switchActiveDataset(
   return activeDataset;
 }
 
-export async function addVoiceLockSessionToDataset(
+export async function addViimSessionToDataset(
   userId: string,
   datasetId: string,
   phrasesCount: number,
@@ -402,13 +403,13 @@ export async function addVoiceLockSessionToDataset(
     transcript?: string;
     chatMessages?: any[]; // ChatMessage[] from types
   }
-): Promise<{ session: VoiceLockSession; dataset: VoiceLockDataset }> {
+): Promise<{ session: ViimSession; dataset: ViimDataset }> {
   const adminFirestore = getAdminFirestore();
   const now = Timestamp.now();
   const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
   // Create session
-  const session: VoiceLockSession = {
+  const session: ViimSession = {
     userId,
     sessionId,
     phrasesCount,
@@ -423,11 +424,11 @@ export async function addVoiceLockSessionToDataset(
     chatMessages: options?.chatMessages,
   };
 
-  await adminFirestore.collection("voiceLockSessions").add(session);
+  await adminFirestore.collection("viimSessions").add(session);
 
   // Update dataset
   const datasetRef = adminFirestore
-    .collection("voiceLockDatasets")
+    .collection("viimDatasets")
     .where("userId", "==", userId)
     .where("datasetId", "==", datasetId)
     .limit(1);
@@ -439,7 +440,7 @@ export async function addVoiceLockSessionToDataset(
   }
 
   const datasetDoc = datasetSnapshot.docs[0];
-  const existing = datasetDoc.data() as VoiceLockDataset;
+  const existing = datasetDoc.data() as ViimDataset;
 
   const mobileSamples = source === "mobile" 
     ? existing.mobileSamples + 1 
@@ -452,7 +453,7 @@ export async function addVoiceLockSessionToDataset(
   const datasetCompletion = calculateDatasetCompletion(mobileSamples, studioSamples, studioVerified);
   const status = determineStatus(mobileSamples, studioSamples, studioVerified);
 
-  const updated: VoiceLockDataset = {
+  const updated: ViimDataset = {
     ...existing,
     mobileSamples,
     studioSamples,
@@ -464,5 +465,169 @@ export async function addVoiceLockSessionToDataset(
   await datasetDoc.ref.update(updated);
 
   return { session, dataset: updated };
+}
+
+// ==================== Voiceprint Functions ====================
+
+export async function createVoiceprint(
+  userId: string,
+  embedding: number[],
+  sample: VoiceprintSample
+): Promise<Voiceprint> {
+  const adminFirestore = getAdminFirestore();
+  const now = Timestamp.now();
+  const voiceprintId = `vp_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+
+  const voiceprint: Voiceprint = {
+    userId,
+    voiceprintId,
+    embedding,
+    sampleCount: 1,
+    samples: [sample],
+    createdAt: now,
+    updatedAt: now,
+    modelVersion: "speechbrain/spkrec-ecapa-voxceleb",
+  };
+
+  const voiceprintRef = adminFirestore.collection("voiceprints").doc(voiceprintId);
+  await voiceprintRef.set(voiceprint);
+
+  // Store sample in subcollection
+  await voiceprintRef
+    .collection("samples")
+    .doc(sample.sampleId)
+    .set(sample);
+
+  return voiceprint;
+}
+
+export async function updateVoiceprint(
+  userId: string,
+  newEmbedding: number[],
+  newSample: VoiceprintSample
+): Promise<Voiceprint> {
+  const adminFirestore = getAdminFirestore();
+  const now = Timestamp.now();
+
+  // Find existing voiceprint for user
+  const voiceprintsSnapshot = await adminFirestore
+    .collection("voiceprints")
+    .where("userId", "==", userId)
+    .limit(1)
+    .get();
+
+  if (voiceprintsSnapshot.empty) {
+    // Create new voiceprint if none exists
+    return createVoiceprint(userId, newEmbedding, newSample);
+  }
+
+  const voiceprintDoc = voiceprintsSnapshot.docs[0];
+  const existing = voiceprintDoc.data() as Voiceprint;
+
+  // Get all sample embeddings
+  const samplesSnapshot = await voiceprintDoc.ref
+    .collection("samples")
+    .get();
+
+  const allEmbeddings = samplesSnapshot.docs.map((doc) => {
+    const sample = doc.data() as VoiceprintSample;
+    return sample.embedding;
+  });
+  allEmbeddings.push(newEmbedding);
+
+  // Compute new average embedding
+  const averagedEmbedding = averageEmbeddings(allEmbeddings);
+
+  // Update voiceprint
+  const updated: Voiceprint = {
+    ...existing,
+    embedding: averagedEmbedding,
+    sampleCount: existing.sampleCount + 1,
+    samples: [...existing.samples, newSample],
+    updatedAt: now,
+  };
+
+  await voiceprintDoc.ref.update(updated);
+
+  // Add new sample to subcollection
+  await voiceprintDoc.ref
+    .collection("samples")
+    .doc(newSample.sampleId)
+    .set(newSample);
+
+  return updated;
+}
+
+export async function getVoiceprint(userId: string): Promise<Voiceprint | null> {
+  const adminFirestore = getAdminFirestore();
+  const snapshot = await adminFirestore
+    .collection("voiceprints")
+    .where("userId", "==", userId)
+    .limit(1)
+    .get();
+
+  if (snapshot.empty) {
+    return null;
+  }
+
+  const doc = snapshot.docs[0];
+  const voiceprint = doc.data() as Voiceprint;
+
+  // Load samples from subcollection
+  const samplesSnapshot = await doc.ref.collection("samples").get();
+  voiceprint.samples = samplesSnapshot.docs.map(
+    (sampleDoc) => sampleDoc.data() as VoiceprintSample
+  );
+
+  return voiceprint;
+}
+
+export async function getAllVoiceprints(): Promise<Voiceprint[]> {
+  const adminFirestore = getAdminFirestore();
+  const snapshot = await adminFirestore.collection("voiceprints").get();
+
+  const voiceprints: Voiceprint[] = [];
+  for (const doc of snapshot.docs) {
+    const voiceprint = doc.data() as Voiceprint;
+
+    // Load samples from subcollection
+    const samplesSnapshot = await doc.ref.collection("samples").get();
+    voiceprint.samples = samplesSnapshot.docs.map(
+      (sampleDoc) => sampleDoc.data() as VoiceprintSample
+    );
+
+    voiceprints.push(voiceprint);
+  }
+
+  return voiceprints;
+}
+
+export async function findMatchingVoiceprints(
+  queryEmbedding: number[],
+  threshold: number = 0.7
+): Promise<Array<{ userId: string; voiceprintId: string; similarity: number }>> {
+  const adminFirestore = getAdminFirestore();
+  const allVoiceprints = await getAllVoiceprints();
+
+  const matches: Array<{ userId: string; voiceprintId: string; similarity: number }> = [];
+
+  // Import cosine similarity function
+  const { cosineSimilarity } = await import("./voiceprintUtils");
+
+  for (const voiceprint of allVoiceprints) {
+    const similarity = cosineSimilarity(queryEmbedding, voiceprint.embedding);
+    if (similarity >= threshold) {
+      matches.push({
+        userId: voiceprint.userId,
+        voiceprintId: voiceprint.voiceprintId,
+        similarity,
+      });
+    }
+  }
+
+  // Sort by similarity (highest first)
+  matches.sort((a, b) => b.similarity - a.similarity);
+
+  return matches;
 }
 

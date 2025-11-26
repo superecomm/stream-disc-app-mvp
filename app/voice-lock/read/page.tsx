@@ -521,7 +521,6 @@ export default function VoiceLockRead() {
                   onStreamReady={setPreviewStream}
                   totalItems={displayItems.length}
                   currentItemIndex={currentItemIndex}
-                  triggerStart={triggerRecordStart}
                 />
               </div>
 

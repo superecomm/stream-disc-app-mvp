@@ -1,12 +1,12 @@
-# VoiceLock™ by Stream Disc
+# Stream Disc
 
-A voice security system built with Next.js, TypeScript, and Firebase. This functional prototype demonstrates the VoiceLock concept with a clean architecture designed for AI integration in the next phase.
+A voice identity intelligence system built with Next.js, TypeScript, and Firebase. Features AI-powered voice fingerprinting, speaker verification, and voice-based authentication.
 
 ## Features
 
 - **User Authentication**: Firebase Email/Password authentication
-- **VoiceLock Profile Setup**: Create and manage your voice profile
-- **Asset Verification**: Verify assets with VoiceLock scoring and serial generation
+- **Voice Fingerprint Enrollment**: Create and manage your voice profile
+- **Speaker Verification**: Verify voice identity with AI-powered matching
 - **Analytics Dashboard**: Track verifications and view detailed statistics
 - **Clean Architecture**: Structured for easy ML model integration
 
@@ -15,7 +15,7 @@ A voice security system built with Next.js, TypeScript, and Firebase. This funct
 - **Frontend**: Next.js 14+ (App Router), TypeScript, Tailwind CSS
 - **Backend**: Firebase Firestore (via Admin SDK)
 - **Authentication**: Firebase Auth
-- **VoiceLock Engine**: Functional prototype engine with deterministic scoring for design and demo purposes
+- **VIIM Engine**: Voice Identity Intelligence Model with ECAPA-TDNN embeddings
 
 ## Getting Started
 
@@ -30,7 +30,7 @@ A voice security system built with Next.js, TypeScript, and Firebase. This funct
 1. Clone the repository:
 ```bash
 git clone <repository-url>
-cd stream-disc-voice-lock
+cd stream-disc-app-mvp
 ```
 
 2. Install dependencies:
@@ -67,7 +67,7 @@ npm run dev
 ## Project Structure
 
 ```
-stream-disc-voice-lock/
+stream-disc-app-mvp/
 ├── app/
 │   ├── api/
 │   │   └── voice-lock/

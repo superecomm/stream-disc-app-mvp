@@ -11,12 +11,12 @@ export default function Home() {
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const router = useRouter();
 
-  // Redirect logged-in users to reading session
+  // Redirect everyone to reading session (skip login for now)
   useEffect(() => {
-    if (!loading && currentUser) {
-      router.push("/voice-lock/read");
+    if (!loading) {
+      router.push("/viim/read");
     }
-  }, [currentUser, loading, router]);
+  }, [loading, router]);
 
   return (
     <>
@@ -25,10 +25,10 @@ export default function Home() {
           {/* Header */}
           <div className="text-center mb-16">
             <h1 className="text-5xl font-bold mb-4 text-[#111111]">
-              VoiceLock™
+              Stream Disc
             </h1>
             <p className="text-xl text-slate-600 mb-2">
-              by Stream Disc
+              Voice Identity Intelligence Model
             </p>
             <p className="text-base text-slate-500 mt-4">
               Voice security system — functional prototype phase before AI integration
@@ -42,7 +42,7 @@ export default function Home() {
                 Register Your Voice
               </h2>
               <p className="text-slate-600 leading-relaxed">
-                Create your VoiceLock profile through guided reading sessions. Each recording builds your unique voice signature for authentication.
+                Create your Stream Disc profile through guided reading sessions. Each recording builds your unique voice signature for authentication.
               </p>
             </div>
 
@@ -51,7 +51,7 @@ export default function Home() {
                 Secure Your Assets
               </h2>
               <p className="text-slate-600 leading-relaxed">
-                Every asset receives a VoiceLock verification score and unique serial code. Protect your original recordings and establish authenticity.
+                Every asset receives a Stream Disc verification score and unique serial code. Protect your original recordings and establish authenticity.
               </p>
             </div>
 
@@ -71,7 +71,7 @@ export default function Home() {
               Your Voice. Your Identity. Protected.
             </h2>
             <p className="text-slate-600 max-w-2xl mx-auto leading-relaxed">
-              VoiceLock provides biometric-grade voice authentication for artists and creators. 
+              Stream Disc provides biometric-grade voice authentication for artists and creators. 
               Build your voice profile through mobile sessions, then verify your assets with industry-leading security. 
               Your voice signature is unique, secure, and cannot be replicated.
             </p>
@@ -82,7 +82,7 @@ export default function Home() {
             {currentUser ? (
               <div className="space-y-4">
                 <Link
-                  href="/voice-lock/read"
+                  href="/viim/read"
                   className="inline-block px-8 py-3 bg-[#111111] text-white rounded-md hover:bg-slate-800 transition-colors font-semibold"
                 >
                   Start Reading Session
@@ -105,7 +105,7 @@ export default function Home() {
                   Get Started
                 </button>
                 <p className="text-sm text-slate-500">
-                  Sign up to create your VoiceLock profile
+                  Sign up to create your Stream Disc profile
                 </p>
               </div>
             )}

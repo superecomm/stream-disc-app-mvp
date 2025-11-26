@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createOrUpdateVoiceLockProfile, getVoiceLockProfile } from "@/lib/firestore";
+import { createOrUpdateViimProfile, getViimProfile } from "@/lib/firestore";
 
 export async function GET(request: NextRequest) {
   try {
@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const profile = await getVoiceLockProfile(userId);
+    const profile = await getViimProfile(userId);
 
     if (!profile) {
       return NextResponse.json(
@@ -49,11 +49,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const profile = await createOrUpdateVoiceLockProfile(userId, samplesCount);
+    const profile = await createOrUpdateViimProfile(userId, samplesCount);
 
     return NextResponse.json({
-      voiceLockId: profile.voiceLockId,
-      hasVoiceLock: profile.hasVoiceLock,
+      viimId: profile.viimId,
+      hasVoiceLock: profile.hasVoiceLock || false,
       samplesCount: profile.samplesCount,
       calibrationLevel: profile.calibrationLevel,
       createdAt: profile.createdAt.toDate().toISOString(),
