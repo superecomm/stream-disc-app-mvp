@@ -1,8 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Disabled static export to support API routes
-  // For Firebase deployment, consider using Vercel or deploying Next.js as a server
+  // Enable standalone output for Docker/Cloud Run deployment
+  output: 'standalone',
   images: {
     unoptimized: true,
   },
