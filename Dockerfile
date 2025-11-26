@@ -1,5 +1,5 @@
-# Use Node.js 18 Alpine for smaller image
-FROM node:18-alpine AS base
+# Use Node.js 20 Alpine for smaller image (Next.js 16 requires Node 20+)
+FROM node:20-alpine AS base
 
 # Install dependencies only when needed
 FROM base AS deps
