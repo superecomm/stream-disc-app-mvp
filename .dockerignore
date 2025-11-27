@@ -52,9 +52,10 @@ ui-debug.log
 # Functions (Firebase Functions not needed in main app)
 functions
 
-# ML Service (will be deployed separately)
-services/viim-ml
-
+# ML Service artifacts
+services/viim-ml/__pycache__/
+services/viim-ml/*.db
+# keep pre-downloaded model cache for container build
 # Documentation
 *.md
 !README.md

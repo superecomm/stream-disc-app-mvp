@@ -13,7 +13,7 @@ model = EncoderClassifier.from_hparams(
     source="speechbrain/spkrec-ecapa-voxceleb",
     savedir="./model_cache"
 )
-print("✓ Model downloaded successfully to ./model_cache")
+print("Model downloaded successfully to ./model_cache")
 
 print("\nModel files:")
 for root, dirs, files in os.walk("./model_cache"):

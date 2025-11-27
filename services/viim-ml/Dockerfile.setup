@@ -1,0 +1,24 @@
+FROM python:3.10-slim
+
+WORKDIR /setup
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libsndfile1 \
+    ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python packages
+RUN pip install --no-cache-dir \
+    torch>=2.0.0 \
+    speechbrain>=0.5.16 \
+    torchaudio \
+    google-cloud-storage
+
+# Copy download script
+COPY download_and_upload.py .
+
+# Run the download and upload script
+CMD ["python", "download_and_upload.py"]
+

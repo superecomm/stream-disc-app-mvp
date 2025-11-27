@@ -13,6 +13,15 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Copy pre-downloaded SpeechBrain model cache (from GCS) into image
+COPY model_cache /tmp/model_cache
+RUN mkdir -p /root/.cache/speechbrain/spkrec-ecapa-voxceleb \
+    && cp -R /tmp/model_cache/. /root/.cache/speechbrain/spkrec-ecapa-voxceleb \
+    && rm -rf /tmp/model_cache
+
+ENV TORCHAUDIO_BACKEND=soundfile \
+    SPEECHBRAIN_OFFLINE=True
+
 # Copy application code
 COPY . .
 

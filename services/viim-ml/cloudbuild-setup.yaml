@@ -1,0 +1,17 @@
+steps:
+  # Build the setup container
+  - name: 'gcr.io/cloud-builders/docker'
+    args: 
+      - 'build'
+      - '-f'
+      - 'Dockerfile.setup'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/model-setup'
+      - '.'
+  
+  # Run the container to download and upload model
+  - name: 'gcr.io/$PROJECT_ID/model-setup'
+    args: []
+    
+timeout: 1800s  # 30 minutes for model download and upload
+

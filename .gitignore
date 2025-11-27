@@ -59,6 +59,7 @@ voiceprints.db
 # ML Service
 services/viim-ml/__pycache__/
 services/viim-ml/*.db
+services/viim-ml/model_cache/
 
 # vercel
 .vercel

@@ -4,6 +4,13 @@ Extracts 192-dimensional speaker embeddings from audio.
 """
 
 import numpy as np
+import os
+os.environ.setdefault("TORCHAUDIO_BACKEND", "soundfile")
+
+import torchaudio  # ensure present before SpeechBrain import
+if not hasattr(torchaudio, "list_audio_backends"):
+    torchaudio.list_audio_backends = lambda: []
+
 from speechbrain.inference.speaker import EncoderClassifier
 from typing import Optional
 import logging
