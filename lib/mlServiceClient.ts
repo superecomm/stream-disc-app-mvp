@@ -3,12 +3,31 @@
  * Handles embedding extraction and similarity computation.
  */
 
-const rawMlServiceUrl =
-  process.env.NEXT_PUBLIC_ML_SERVICE_URL ||
-  process.env.ML_SERVICE_URL ||
-  "http://localhost:8000";
+function normalizeBaseUrl(raw?: string) {
+  if (!raw) {
+    throw new Error("ML service URL is not configured");
+  }
 
-const ML_SERVICE_URL = rawMlServiceUrl.split(/\s+/)[0];
+  let url = raw.trim();
+
+  if (url.includes("/extract-embedding")) {
+    console.warn(
+      "[Config Warning] NEXT_PUBLIC_ML_SERVICE_URL should not include /extract-embedding. Stripping it automatically."
+    );
+    url = url.replace(/\/extract-embedding\/?$/i, "");
+  }
+
+  // Remove any trailing slashes
+  url = url.replace(/\/+$/, "");
+
+  return url;
+}
+
+const ML_SERVICE_URL = normalizeBaseUrl(
+  process.env.NEXT_PUBLIC_ML_SERVICE_URL ||
+    process.env.ML_SERVICE_URL ||
+    "http://localhost:8000"
+);
 
 export interface EmbeddingResponse {
   embedding: number[];
