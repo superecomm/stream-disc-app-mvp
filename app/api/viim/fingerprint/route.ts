@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { extractEmbedding, checkMLServiceHealth } from "@/lib/mlServiceClient";
+import { resolveMlBaseUrl } from "@/lib/mlBaseUrl";
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
@@ -18,7 +19,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if ML service is available
-    modelConnected = await checkMLServiceHealth();
+    const mlBaseUrl = resolveMlBaseUrl();
+
+    if (process.env.NODE_ENV !== "production") {
+      console.log("[VIIM fingerprint] Using ML base URL:", mlBaseUrl);
+    }
+
+    modelConnected = await checkMLServiceHealth({ baseUrl: mlBaseUrl });
     
     if (!modelConnected) {
       // Fallback to stub if ML service unavailable
@@ -40,7 +47,9 @@ export async function POST(request: NextRequest) {
     });
 
     // Extract embedding from ML service
-    const embeddingResponse = await extractEmbedding(audioBlob);
+    const embeddingResponse = await extractEmbedding(audioBlob, {
+      baseUrl: mlBaseUrl,
+    });
     const embedding = embeddingResponse.embedding;
 
     // Generate unique fingerprint string from embedding hash

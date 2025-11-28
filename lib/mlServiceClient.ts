@@ -3,12 +3,37 @@
  * Handles embedding extraction and similarity computation.
  */
 
-import { getMlBaseUrl } from "@/lib/mlBaseUrl";
+import { resolveMlBaseUrl } from "@/lib/mlBaseUrl";
 
-const ML_SERVICE_URL =
-  typeof window === "undefined"
-    ? getMlBaseUrl()
-    : (process.env.NEXT_PUBLIC_ML_SERVICE_URL || "").replace(/\/extract-embedding\/?$/i, "").replace(/\/+$/, "");
+type MlRequestOptions = {
+  baseUrl?: string;
+};
+
+export interface ExtractEmbeddingOptions extends MlRequestOptions {
+  userId?: string;
+  mode?: string;
+  voiceprintId?: string;
+}
+
+function resolveServiceUrl(options?: MlRequestOptions): string {
+  if (options?.baseUrl) {
+    return options.baseUrl;
+  }
+
+  if (typeof window === "undefined") {
+    return resolveMlBaseUrl();
+  }
+
+  const raw = (process.env.NEXT_PUBLIC_ML_SERVICE_URL || "").trim();
+
+  if (!raw) {
+    throw new Error(
+      "NEXT_PUBLIC_ML_SERVICE_URL is not set. Configure it for client-side ML calls."
+    );
+  }
+
+  return raw.replace(/\/extract-embedding\/?$/i, "").replace(/\/+$/, "");
+}
 
 export interface EmbeddingResponse {
   embedding: number[];
@@ -33,11 +58,12 @@ export interface SimilarityResponse {
  */
 export async function extractEmbedding(
   audioBlob: Blob,
-  userId?: string,
-  mode?: string,
-  voiceprintId?: string
+  options: ExtractEmbeddingOptions = {}
 ): Promise<EmbeddingResponse> {
   try {
+    const { userId, mode, voiceprintId } = options;
+    const serviceUrl = resolveServiceUrl(options);
+
     const formData = new FormData();
     formData.append("audio", audioBlob, "recording.webm");
     
@@ -51,7 +77,7 @@ export async function extractEmbedding(
       formData.append("voiceprint_id", voiceprintId);
     }
 
-    const response = await fetch(`${ML_SERVICE_URL}/extract-embedding`, {
+    const response = await fetch(`${serviceUrl}/extract-embedding`, {
       method: "POST",
       body: formData,
     });
@@ -84,11 +110,13 @@ export async function extractEmbedding(
 export async function computeSimilarity(
   emb1: number[],
   emb2: number[],
-  threshold: number = 0.7
+  threshold: number = 0.7,
+  options: MlRequestOptions = {}
 ): Promise<SimilarityResponse> {
   try {
+    const serviceUrl = resolveServiceUrl(options);
     const response = await fetch(
-      `${ML_SERVICE_URL}/compute-similarity?threshold=${threshold}`,
+      `${serviceUrl}/compute-similarity?threshold=${threshold}`,
       {
         method: "POST",
         headers: {
@@ -145,11 +173,13 @@ export async function searchRecordings(
   embedding: number[],
   threshold: number = 0.5,
   limit: number = 3,
-  recordingId?: string
+  recordingId?: string,
+  options: MlRequestOptions = {}
 ): Promise<SearchResult> {
   try {
+    const serviceUrl = resolveServiceUrl(options);
     const response = await fetch(
-      `${ML_SERVICE_URL}/recordings/search?threshold=${threshold}&limit=${limit}`,
+      `${serviceUrl}/recordings/search?threshold=${threshold}&limit=${limit}`,
       {
         method: "POST",
         headers: {
@@ -184,9 +214,12 @@ export async function searchRecordings(
  * 
  * @returns True if service is available
  */
-export async function checkMLServiceHealth(): Promise<boolean> {
+export async function checkMLServiceHealth(
+  options: MlRequestOptions = {}
+): Promise<boolean> {
   try {
-    const response = await fetch(`${ML_SERVICE_URL}/health`, {
+    const serviceUrl = resolveServiceUrl(options);
+    const response = await fetch(`${serviceUrl}/health`, {
       method: "GET",
       signal: AbortSignal.timeout(5000), // 5 second timeout
     });

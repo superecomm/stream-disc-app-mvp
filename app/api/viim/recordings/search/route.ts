@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { searchRecordings } from "@/lib/mlServiceClient";
+import { resolveMlBaseUrl } from "@/lib/mlBaseUrl";
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,12 +14,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const mlBaseUrl = resolveMlBaseUrl();
+
+    if (process.env.NODE_ENV !== "production") {
+      console.log("[VIIM recordings/search] Using ML base URL:", mlBaseUrl);
+    }
+
     // Call ML service search endpoint
     const results = await searchRecordings(
       embedding,
       threshold || 0.5,
       limit || 3,
-      recordingId
+      recordingId,
+      { baseUrl: mlBaseUrl }
     );
 
     return NextResponse.json(results);

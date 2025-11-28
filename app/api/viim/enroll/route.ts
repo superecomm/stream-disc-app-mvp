@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { extractEmbedding } from "@/lib/mlServiceClient";
+import { resolveMlBaseUrl } from "@/lib/mlBaseUrl";
 import { createVoiceprint, updateVoiceprint, getVoiceprint } from "@/lib/firestore";
 import type { VoiceprintSample } from "@/types/viim";
 import { Timestamp } from "firebase-admin/firestore";
@@ -31,8 +32,16 @@ export async function POST(request: NextRequest) {
       type: audioFile.type,
     });
 
+    const mlBaseUrl = resolveMlBaseUrl();
+
+    if (process.env.NODE_ENV !== "production") {
+      console.log("[VIIM enroll] Using ML base URL:", mlBaseUrl);
+    }
+
     // Extract embedding from ML service
-    const embeddingResponse = await extractEmbedding(audioBlob);
+    const embeddingResponse = await extractEmbedding(audioBlob, {
+      baseUrl: mlBaseUrl,
+    });
     const embedding = embeddingResponse.embedding;
 
     // Create sample record

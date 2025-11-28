@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { extractEmbedding } from "@/lib/mlServiceClient";
+import { resolveMlBaseUrl } from "@/lib/mlBaseUrl";
 import { findMatchingVoiceprints } from "@/lib/firestore";
 
 const DEFAULT_THRESHOLD = 0.7;
@@ -29,13 +30,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const mlBaseUrl = resolveMlBaseUrl();
+
+    if (process.env.NODE_ENV !== "production") {
+      console.log("[VIIM identify] Using ML base URL:", mlBaseUrl);
+    }
+
     // Convert File to Blob
     const audioBlob = new Blob([await audioFile.arrayBuffer()], {
       type: audioFile.type,
     });
 
     // Extract embedding from ML service
-    const embeddingResponse = await extractEmbedding(audioBlob);
+    const embeddingResponse = await extractEmbedding(audioBlob, {
+      baseUrl: mlBaseUrl,
+    });
     const embedding = embeddingResponse.embedding;
 
     // Find matching voiceprints
