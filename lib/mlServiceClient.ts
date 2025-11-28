@@ -3,8 +3,12 @@
  * Handles embedding extraction and similarity computation.
  */
 
-const ML_SERVICE_URL =
-  process.env.ML_SERVICE_URL || "http://localhost:8000";
+const rawMlServiceUrl =
+  process.env.NEXT_PUBLIC_ML_SERVICE_URL ||
+  process.env.ML_SERVICE_URL ||
+  "http://localhost:8000";
+
+const ML_SERVICE_URL = rawMlServiceUrl.split(/\s+/)[0];
 
 export interface EmbeddingResponse {
   embedding: number[];
