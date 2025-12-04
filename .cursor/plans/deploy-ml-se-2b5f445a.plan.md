@@ -1,16 +1,11 @@
-<!-- 2b5f445a-efba-470d-8667-d3abb31b49c2 ea3218d5-a21a-4d87-bd88-bb95e4e38fd8 -->
-# Runtime ML URL Refactor
+<!-- 2b5f445a-efba-470d-8667-d3abb31b49c2 ef58cb11-524c-46d9-bcdc-aed3e62c966d -->
+# Plan
+1. Scaffold server routes under `app/api/llm/` (OpenAI, Anthropic, Gemini) that call each provider with env-based API keys, normalize responses, and guard missing configs.
+2. Update `lib/models/llmModels.ts` + `modelRegistry.ts` so each model hits the appropriate internal route and handles provider-specific payloads/errors.
+3. Verify NeuralBox text + voice flows call the new routes, log conversation entries, and surface errors gracefully; adjust docs/env notes if needed.
 
-## Steps
+### To-dos
 
-1. **Add runtime helper** – Update `lib/mlBaseUrl.ts` to export `resolveMlBaseUrl()` that reads env vars only when called, strips `/extract-embedding`, logs in non-prod, and does not compute at module scope.
-2. **Refactor API routes** – For each ML-calling route (`app/api/viim/enroll`, `fingerprint`, `identify`, `recordings/search`, plus any others discovered), remove top-level constants, call `resolveMlBaseUrl()` inside handlers, and build URLs per request.
-3. **Update shared client** – Ensure `lib/mlServiceClient.ts` (and other server utilities) import and call `resolveMlBaseUrl()` at runtime, removing any cached constants or `NEXT_PUBLIC` references.
-4. **Verify & redeploy** – Run `npm run build` locally, redeploy Cloud Run with only `ML_SERVICE_URL` set, then smoke-test `/viim/beta-test` and confirm logs show the clean endpoint.
-
-## Todos
-
-- helper-update: Implement resolveMlBaseUrl runtime helper.
-- route-refactor: Update all ML API routes to call helper per request.
-- client-update: Point shared ML client/utilities to the helper and remove NEXT_PUBLIC usage.
-- deploy-verify: Build, redeploy with ML_SERVICE_URL, smoke-test beta page.
+- [ ] Create OpenAI/Anthropic/Gemini API routes
+- [ ] Point llmModels/modelRegistry to new routes
+- [ ] Exercise NeuralBox + env guidance

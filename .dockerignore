@@ -1,65 +1,66 @@
 # Dependencies
 node_modules
-npm-debug.log
-yarn-error.log
-yarn.lock
-pnpm-lock.yaml
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
-# Next.js build output
+# Next.js
 .next
 out
-
-# Environment files
-.env
-.env.local
-.env.development
-.env.production
-.env*.local
-
-# Git
-.git
-.gitignore
-
-# IDE
-.vscode
-.idea
-.cursor
-*.swp
-*.swo
+.vercel
 
 # Testing
 coverage
 .nyc_output
 
-# Misc
+# Environment variables
+.env
+.env*.local
+.env.local
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS
 .DS_Store
-*.pem
+Thumbs.db
 
-# Debug
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+# Git
+.git
+.gitignore
+.gitattributes
 
-# Vercel
-.vercel
-
-# Firebase
-.firebase
-firebase-debug.log
-firestore-debug.log
-ui-debug.log
-
-# Functions (Firebase Functions not needed in main app)
-functions
-
-# ML Service artifacts
-services/viim-ml/__pycache__/
-services/viim-ml/*.db
-# keep pre-downloaded model cache for container build
 # Documentation
 *.md
 !README.md
 
-# Logs
-*.log
+# CI/CD
+.github
+.gitlab-ci.yml
 
+# Firebase
+.firebase
+.firebaserc
+firebase-debug.log
+firestore-debug.log
+
+# Misc
+*.log
+*.tmp
+.cache
+dist
+build
+
+# Plans and docs (not needed in container)
+plans/
+*.plan.md
+
+# Services (ML service has its own Dockerfile)
+services/
+
+# Functions (deployed separately)
+functions/

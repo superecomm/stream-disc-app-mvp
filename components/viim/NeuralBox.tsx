@@ -4,24 +4,36 @@ import { useState, useEffect, useRef } from "react";
 import VIIMAnimation from "./VIIMAnimation";
 import { useVIIMRecorder } from "./VIIMRecorder";
 import { useViim } from "@/contexts/VIIMContext";
+import type { ViimState } from "@/contexts/VIIMContext";
 import { GreetingBubble } from "./GreetingBubble";
 import { VIIMInfo } from "./VIIMInfo";
 import { ActiveIndicator } from "./ActiveIndicator";
-import { allModels, getModelsForMode, getModelById } from "@/lib/models/modelRegistry";
-import { Mic, Send, Square } from "lucide-react";
+import { llmModels, getModelById } from "@/lib/models/modelRegistry";
+import { Send, Plus, Camera, Image, Globe, BookOpen, PenSquare, ShoppingBag, Paperclip, Bot } from "lucide-react";
 import { processWhisper } from "@/lib/models/whisper";
-import { processWav2vec } from "@/lib/models/wav2vec";
-import { processHubert } from "@/lib/models/hubert";
-import { processEncodec } from "@/lib/models/encodec";
-import { processConformer } from "@/lib/models/conformer";
-import { processGPT, processClaude } from "@/lib/models/llmModels";
+import {
+  processGPT,
+  processGPTCode,
+  processClaude,
+  processSonnet,
+  processGemini,
+  processGrok,
+  processCursor,
+} from "@/lib/models/llmModels";
 import { processElevenLabs, processSuno, processHume, processRunway } from "@/lib/models/audioModels";
+import { MobileKeyboardMock } from "@/components/mobile/MobileKeyboardMock";
 
 interface NeuralBoxProps {
   audioDeviceId?: string;
   onTranscript?: (text: string) => void;
   onResponse?: (text: string) => void;
   className?: string;
+  variant?: "assistant" | "capture";
+  onAudioCapture?: (audioBlob: Blob) => Promise<void> | void;
+  onStateChange?: (state: ViimState) => void;
+  showInputPanel?: boolean;
+  forcePromptVisible?: boolean;
+  showKeyboardMock?: boolean;
 }
 
 export function NeuralBox({
@@ -29,6 +41,12 @@ export function NeuralBox({
   onTranscript,
   onResponse,
   className = "",
+  variant = "assistant",
+  onAudioCapture,
+  onStateChange,
+  showInputPanel = true,
+  forcePromptVisible = false,
+  showKeyboardMock = false,
 }: NeuralBoxProps) {
   const {
     state,
@@ -47,15 +65,27 @@ export function NeuralBox({
     setShowInfo,
     setLastTranscript,
     setLastPrompt,
+    addConversationEntry,
   } = useViim();
 
   const [textInput, setTextInput] = useState("");
   const [isProcessingInput, setIsProcessingInput] = useState(false);
+  const [hasActivatedOnce, setHasActivatedOnce] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const inputContainerRef = useRef<HTMLDivElement>(null);
+  const [isKeyboardMockVisible, setIsKeyboardMockVisible] = useState(showKeyboardMock);
+  const [isPlusMenuOpen, setIsPlusMenuOpen] = useState(false);
 
-  // Get available models based on current input mode
-  const availableModels = getModelsForMode(inputMode);
+  const createConversationEntry = (role: "user" | "assistant", content: string) => ({
+    id: typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${role}-${Date.now()}-${Math.random()}`,
+    role,
+    content,
+    timestamp: Date.now(),
+    model: selectedModel,
+  });
+
+  // The model roster mirrors the LLM picker from the Cursor mock
+  const availableModels = llmModels;
   const currentModel = getModelById(selectedModel) || availableModels[0];
 
   // Audio recording setup
@@ -70,43 +100,44 @@ export function NeuralBox({
     onAudioData: async (audioBlob) => {
       setIsListening(false);
       setState("processing");
-      
-      // Process audio with selected model
-      try {
-        let response;
-        switch (selectedModel) {
-          case "whisper":
-            response = await processWhisper(audioBlob);
-            break;
-          case "wav2vec":
-            response = await processWav2vec(audioBlob);
-            break;
-          case "hubert":
-            response = await processHubert(audioBlob);
-            break;
-          case "encodec":
-            response = await processEncodec(audioBlob);
-            break;
-          case "conformer":
-            response = await processConformer(audioBlob);
-            break;
-          default:
-            response = await processWhisper(audioBlob);
-        }
 
-        if (response.text) {
-          setLastTranscript(response.text);
-          onTranscript?.(response.text);
+      if (onAudioCapture) {
+        try {
+          await onAudioCapture(audioBlob);
+        } catch (error) {
+          console.error("NeuralBox capture handler error:", error);
+        }
+      }
+
+      if (variant === "capture") {
+        setState("idle");
+        return;
+      }
+      
+      // Process audio by transcribing then routing to the chosen LLM
+      try {
+        const transcription = await processWhisper(audioBlob);
+
+        if (transcription.text) {
+          const trimmedTranscript = transcription.text.trim();
+          setLastTranscript(trimmedTranscript);
+          onTranscript?.(trimmedTranscript);
+          if (trimmedTranscript) {
+            addConversationEntry(createConversationEntry("user", trimmedTranscript));
+          }
           
           // Get LLM response
-          const llmResponse = await processLLM(response.text);
+          const llmResponse = await processLLM(selectedModel, transcription.text);
           if (llmResponse) {
             setState("speaking");
+            addConversationEntry(createConversationEntry("assistant", llmResponse));
             onResponse?.(llmResponse);
             setTimeout(() => setState("idle"), 3000);
           } else {
             setState("idle");
           }
+        } else {
+          setState("idle");
         }
       } catch (error) {
         console.error("Error processing audio:", error);
@@ -121,29 +152,33 @@ export function NeuralBox({
   });
 
   // Process LLM response
-  const processLLM = async (text: string): Promise<string | null> => {
+  const processLLM = async (modelId: string, text: string): Promise<string | null> => {
     try {
-      switch (selectedModel) {
+      switch (modelId) {
         case "gpt-5.1":
-          const gptResponse = await processGPT(text);
-          return gptResponse.text || null;
+          return (await processGPT(text)).text || null;
+        case "gpt-5.1-code":
+          return (await processGPTCode(text)).text || null;
+        case "sonnet-4.5":
+          return (await processSonnet(text)).text || null;
         case "claude-3.5":
-          const claudeResponse = await processClaude(text);
-          return claudeResponse.text || null;
+          return (await processClaude(text)).text || null;
+        case "gemini-3-pro":
+          return (await processGemini(text)).text || null;
+        case "grok-3":
+          return (await processGrok(text)).text || null;
+        case "cursor-max":
+          return (await processCursor(text)).text || null;
         case "elevenlabs":
-          const elevenResponse = await processElevenLabs(text);
-          return elevenResponse.text || null;
+          return (await processElevenLabs(text)).text || null;
         case "suno":
-          const sunoResponse = await processSuno(text);
-          return sunoResponse.text || null;
+          return (await processSuno(text)).text || null;
         case "hume":
-          const humeResponse = await processHume(text);
-          return humeResponse.text || null;
+          return (await processHume(text)).text || null;
         case "runway":
-          const runwayResponse = await processRunway(text);
-          return runwayResponse.text || null;
+          return (await processRunway(text)).text || null;
         default:
-          return null;
+          return (await processGPT(text)).text || null;
       }
     } catch (error) {
       console.error("Error processing LLM:", error);
@@ -155,6 +190,7 @@ export function NeuralBox({
   const handleActivate = async () => {
     if (!isActivated && state === "idle") {
       setIsActivated(true);
+      setHasActivatedOnce(true);
       setShowGreeting(true);
       
       // Auto-start voice recording if in voice mode, or focus text input
@@ -178,32 +214,6 @@ export function NeuralBox({
     }
   };
 
-  // Handle NeuralBox tap when activated (for voice mode)
-  const handleNeuralBoxClick = async () => {
-    if (isActivated) {
-      if (inputMode === "voice") {
-        if (state === "idle" || state === "listening") {
-          try {
-            await startRecording();
-            // Set recording state after a brief delay
-            setTimeout(() => {
-              if (isRecording) {
-                setState("recording");
-              }
-            }, 100);
-          } catch (error) {
-            console.error("Failed to start recording:", error);
-          }
-        } else if (state === "recording") {
-          stopRecording();
-          setState("idle");
-        }
-      }
-    } else {
-      handleActivate();
-    }
-  };
-
   // Sync recording state with isRecording from recorder
   useEffect(() => {
     if (isRecording && state !== "recording") {
@@ -220,12 +230,15 @@ export function NeuralBox({
 
     setIsProcessingInput(true);
     setState("processing");
-    setLastPrompt(textInput);
+    const trimmedInput = textInput.trim();
+    setLastPrompt(trimmedInput);
+    addConversationEntry(createConversationEntry("user", trimmedInput));
 
     try {
-      const response = await processLLM(textInput);
+      const response = await processLLM(selectedModel, trimmedInput);
       if (response) {
         setState("speaking");
+        addConversationEntry(createConversationEntry("assistant", response));
         onResponse?.(response);
         setTextInput("");
         setTimeout(() => {
@@ -240,6 +253,26 @@ export function NeuralBox({
       console.error("Error processing text:", error);
       setState("idle");
       setIsProcessingInput(false);
+    }
+  };
+
+  const handlePrimaryButtonClick = async () => {
+    if (inputMode === "voice") {
+      if (state === "recording") {
+        stopRecording();
+      } else if (state !== "processing") {
+        try {
+          await startRecording();
+          setTimeout(() => {
+            setState("recording");
+          }, 120);
+        } catch (error) {
+          console.error("Failed to start recording:", error);
+        }
+      }
+    } else {
+      if (!textInput.trim() || isProcessingInput || state === "processing") return;
+      handleTextSubmit();
     }
   };
 
@@ -273,123 +306,172 @@ export function NeuralBox({
     }
   }, [showGreeting]);
 
+  // Surface internal state changes to parent components
+  useEffect(() => {
+    onStateChange?.(state);
+  }, [state, onStateChange]);
+
+  useEffect(() => {
+    setIsKeyboardMockVisible(showKeyboardMock || isPlusMenuOpen);
+  }, [showKeyboardMock, isPlusMenuOpen]);
+
+  const isVoiceMode = inputMode === "voice";
+  const canSendText = Boolean(textInput.trim());
+  const primaryButtonDisabled = isVoiceMode
+    ? state === "processing" || isProcessingInput
+    : !canSendText || isProcessingInput || state === "processing";
   const isActive = state === "listening" || state === "recording" || state === "processing";
+  const promptVisible = forcePromptVisible || isActivated;
 
   return (
     <div className={`w-full h-full flex flex-col ${className}`}>
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col items-center justify-center px-4 pt-8 pb-24 overflow-y-auto">
-        {/* Greeting Bubble */}
-        {isActivated && <GreetingBubble visible={showGreeting} />}
+      <div className="flex-1 flex flex-col px-4 pt-4 pb-24 overflow-y-auto">
+        <div className="w-full max-w-4xl mx-auto flex flex-col gap-6">
 
-        {/* VIIM Info Display */}
-        {isActivated && <VIIMInfo visible={showInfo} />}
+          {/* Greeting Bubble */}
+          {isActivated && <GreetingBubble visible={showGreeting} />}
 
-        {/* Idle State: Large Black Square with Constellation Animation */}
-        {!isActivated && (
-          <div
-            onClick={handleActivate}
-            className="cursor-pointer transition-all duration-300 touch-manipulation w-full flex flex-col items-center justify-center"
-          >
-            <div className="relative w-[280px] h-[280px] sm:w-[320px] sm:h-[320px] md:w-[380px] md:h-[380px] flex items-center justify-center">
-              <VIIMAnimation
-                state="idle"
-                size="sm"
-                container="square"
-                visualStyle="particles"
-                audioStream={null}
-              />
+          {!hasActivatedOnce ? (
+            <div onClick={handleActivate} className="cursor-pointer flex flex-col items-center justify-center py-6">
+              <div className="relative w-[280px] h-[280px] sm:w-[320px] sm:h-[320px] md:w-[360px] md:h-[360px] flex items-center justify-center">
+                <VIIMAnimation state="idle" size="sm" container="square" visualStyle="particles" audioStream={null} />
+              </div>
+              <p className="text-center text-gray-500 text-sm mt-6 px-4 max-w-md">
+                Tap to launch the neural block. It will dock near the prompt bar after activation.
+              </p>
             </div>
-            <p className="text-center text-gray-500 text-sm mt-4 px-4">
-              {state === "idle" ? "idle state of launch" : "launch in idle state"}
-            </p>
-            <p className="text-center text-gray-400 text-xs mt-2 px-4 max-w-md mx-auto">
-              User taps the box, or the box speaks after launched by voice activation
-            </p>
-          </div>
-        )}
-
-        {/* Activated State: Animation Display (if needed) */}
-        {isActivated && (state === "listening" || state === "recording" || state === "speaking" || state === "processing") && (
-          <div className="my-8">
-            <VIIMAnimation
-              state={state}
-              size="md"
-              container="square"
-              visualStyle="particles"
-              audioStream={getAudioStream()}
-            />
-          </div>
-        )}
+          ) : null}
+        </div>
       </div>
 
       {/* Bottom Input Field (Transformed Box) */}
-      <div
-        ref={inputContainerRef}
-        className={`fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg transition-all duration-500 ease-in-out z-30 ${
-          isActivated
-            ? "translate-y-0 opacity-100"
-            : "translate-y-full opacity-0 pointer-events-none"
-        } safe-area-inset-bottom`}
-      >
-        <div className="max-w-4xl mx-auto px-4 py-4">
-          <div className="flex items-end gap-2">
-            <div className="flex-1 relative">
-              <textarea
-                ref={textareaRef}
-                value={textInput}
-                onChange={(e) => setTextInput(e.target.value)}
-                placeholder="Ask anything"
-                disabled={isProcessingInput || state === "processing" || inputMode === "voice"}
-                rows={1}
-                className="w-full resize-none border border-gray-300 rounded-lg px-4 py-3 pr-20 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400 focus:border-transparent disabled:bg-gray-50 disabled:text-gray-500"
-                style={{ maxHeight: "120px", overflowY: "auto" }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    handleTextSubmit();
-                  }
-                }}
-              />
-              {/* Voice/Text Toggle Icons */}
-              <div className="absolute right-2 bottom-2 flex items-center gap-2">
-                <button
-                  onClick={async (e) => {
-                    e.stopPropagation();
-                    const newMode = inputMode === "voice" ? "text" : "voice";
-                    setInputMode(newMode);
-                    if (newMode === "text") {
-                      setTimeout(() => textareaRef.current?.focus(), 100);
-                    } else if (newMode === "voice" && state === "idle") {
-                      await startRecording();
+      {showInputPanel && (
+        <div
+          ref={inputContainerRef}
+          className={`fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg transition-all duration-500 ease-in-out z-30 ${
+            promptVisible ? "translate-y-0 opacity-100" : "translate-y-full opacity-0 pointer-events-none"
+          } safe-area-inset-bottom`}
+        >
+          <div className="max-w-4xl mx-auto px-4 py-4 space-y-4">
+            <div className="h-2" />
+            <div className="flex items-end gap-3">
+              <div className="flex-1 relative">
+                <textarea
+                  ref={textareaRef}
+                  value={textInput}
+                  onChange={(e) => setTextInput(e.target.value)}
+                  placeholder={isVoiceMode ? "Voice mode active" : "What up?"}
+                  disabled={isVoiceMode || isProcessingInput || state === "processing"}
+                  rows={1}
+                  className="w-full resize-none border border-gray-200 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900/40 focus:border-transparent disabled:bg-gray-50 disabled:text-gray-500 [&::-webkit-scrollbar]:hidden pr-16"
+                  style={{ maxHeight: "150px", overflowY: "auto" }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey && !isVoiceMode) {
+                      e.preventDefault();
+                      handleTextSubmit();
                     }
                   }}
-                  className={`p-2 rounded-lg transition-colors ${
-                    inputMode === "voice" && (state === "listening" || state === "recording")
-                      ? "bg-red-500 text-white animate-pulse"
-                      : inputMode === "voice"
-                      ? "bg-red-500/80 text-white"
-                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                  }`}
-                  aria-label={inputMode === "voice" ? "Switch to text" : "Switch to voice"}
-                >
-                  <Mic className="w-4 h-4" />
-                </button>
-                {inputMode === "text" && (
+                />
+                <div className="pointer-events-auto absolute bottom-1.5 right-3 flex items-center gap-2.5 text-[11px] font-semibold text-gray-500">
                   <button
-                    onClick={handleTextSubmit}
-                    disabled={!textInput.trim() || isProcessingInput || state === "processing"}
-                    className="p-2 rounded-lg bg-gray-900 text-white hover:bg-gray-800 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
-                    aria-label="Send message"
+                    className="rounded-full p-1.5 text-gray-500 hover:text-gray-900 transition touch-manipulation"
+                    aria-label="Add tool"
+                    onClick={() => setIsPlusMenuOpen((prev) => !prev)}
                   >
-                    <Square className="w-4 h-4" />
+                    <Plus className="h-4 w-4" />
                   </button>
-                )}
+                  <button
+                    className="rounded-full p-1.5 text-gray-500 hover:text-gray-900 transition touch-manipulation"
+                    aria-label="Camera"
+                    onClick={() => setIsPlusMenuOpen(true)}
+                  >
+                    <Camera className="h-4 w-4" />
+                  </button>
+                  <button
+                    className="rounded-full p-1.5 text-gray-500 hover:text-gray-900 transition touch-manipulation"
+                    aria-label="Photos"
+                    onClick={() => setIsPlusMenuOpen(true)}
+                  >
+                    <Image className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
+              <button
+                onClick={handlePrimaryButtonClick}
+                disabled={primaryButtonDisabled}
+                className={`flex flex-col items-center gap-1 rounded-3xl px-2 py-1 transition ${
+                  primaryButtonDisabled ? "opacity-40 cursor-not-allowed" : "hover:scale-[1.02]"
+                }`}
+              >
+                <div className="relative w-6 h-6 rounded-full bg-black flex items-center justify-center shadow-lg">
+                  <VIIMAnimation
+                    state={state}
+                    size="xxs"
+                    container="square"
+                    visualStyle="particles"
+                    audioStream={getAudioStream()}
+                  />
+                </div>
+                <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-500">
+                  {isVoiceMode ? (state === "recording" ? "Stop" : "Speak") : "Send"}
+                </span>
+              </button>
             </div>
+            {isPlusMenuOpen && !isKeyboardMockVisible && (
+                <div className="rounded-t-3xl bg-white/95 px-4 pb-6 pt-5 shadow-[0_-20px_35px_rgba(15,23,42,0.15)] border-t">
+                  <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-gray-300" />
+                  <div className="grid grid-cols-3 gap-3">
+                    {[
+                      { icon: Camera, label: "Camera" },
+                      { icon: Image, label: "Photos" },
+                      { icon: PenSquare, label: "Create image" },
+                      { icon: BookOpen, label: "Deep research" },
+                      { icon: Globe, label: "Web search" },
+                      { icon: BookOpen, label: "Study & learn" },
+                      { icon: Bot, label: "Agent mode" },
+                      { icon: Paperclip, label: "Add files" },
+                      { icon: ShoppingBag, label: "Shopping" },
+                    ].map((action) => {
+                      const Icon = action.icon;
+                      return (
+                        <button key={action.label} className="flex flex-col items-center gap-2 rounded-2xl border border-gray-100 bg-gray-50 px-3 py-4 text-xs font-semibold text-gray-700">
+                          <Icon className="h-5 w-5 text-gray-900" />
+                          {action.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="mt-4 flex items-center justify-between rounded-2xl border border-gray-100 bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-600">
+                    <span>Input mode</span>
+                    <div className="inline-flex rounded-full bg-white p-1 text-xs font-semibold text-gray-500">
+                      <button
+                        onClick={() => setInputMode("text")}
+                        className={`px-3 py-1 rounded-full transition ${
+                          !isVoiceMode ? "bg-black text-white shadow" : "text-gray-500"
+                        }`}
+                      >
+                        Chat
+                      </button>
+                      <button
+                        onClick={() => setInputMode("voice")}
+                        className={`px-3 py-1 rounded-full transition ${
+                          isVoiceMode ? "bg-black text-white shadow" : "text-gray-500"
+                        }`}
+                      >
+                        Voice
+                      </button>
+                    </div>
+                  </div>
+                  <div className="mt-4">
+                    <MobileKeyboardMock />
+                  </div>
+                </div>
+            )}
+            {isKeyboardMockVisible && !isPlusMenuOpen && <MobileKeyboardMock />}
           </div>
         </div>
-      </div>
+      )}
 
       {/* Active Indicator (Glowing Red Box) */}
       <ActiveIndicator active={isActive} />

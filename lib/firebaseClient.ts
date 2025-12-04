@@ -18,41 +18,41 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
-if (typeof window !== "undefined") {
-  // Only initialize if we have the required config
-  if (firebaseConfig.apiKey && firebaseConfig.authDomain && firebaseConfig.projectId && firebaseConfig.appId) {
-    try {
-      if (!getApps().length) {
-        firebaseApp = initializeApp(firebaseConfig);
-      } else {
-        firebaseApp = getApps()[0];
-      }
-      auth = getAuth(firebaseApp);
-      db = getFirestore(firebaseApp);
-      
-      // Initialize Analytics only in browser and if measurementId is provided
-      if (firebaseConfig.measurementId && typeof window !== "undefined") {
-        try {
-          analytics = getAnalytics(firebaseApp);
-        } catch (error) {
-          // Analytics might fail in development, that's okay
+const hasRequiredConfig =
+  Boolean(firebaseConfig.apiKey) &&
+  Boolean(firebaseConfig.authDomain) &&
+  Boolean(firebaseConfig.projectId) &&
+  Boolean(firebaseConfig.appId);
+
+if (typeof window !== "undefined" && hasRequiredConfig) {
+  try {
+    if (!getApps().length) {
+      firebaseApp = initializeApp(firebaseConfig);
+    } else {
+      firebaseApp = getApps()[0];
+    }
+    auth = getAuth(firebaseApp);
+    db = getFirestore(firebaseApp);
+
+    // Initialize Analytics only in browser and if measurementId is provided
+    if (firebaseConfig.measurementId) {
+      try {
+        analytics = getAnalytics(firebaseApp);
+      } catch (error) {
+        if (process.env.NODE_ENV !== "production") {
           console.warn("Firebase Analytics initialization skipped:", error);
         }
       }
-      
-      console.log("✅ Firebase initialized successfully");
-    } catch (error) {
-      console.error("❌ Firebase initialization error:", error);
     }
-  } else {
-    console.error("❌ Firebase configuration is missing. Missing values:", {
-      apiKey: !!firebaseConfig.apiKey,
-      authDomain: !!firebaseConfig.authDomain,
-      projectId: !!firebaseConfig.projectId,
-      appId: !!firebaseConfig.appId,
-    });
-    console.error("Please create .env.local file in the project root with your Firebase credentials.");
+
+    if (process.env.NODE_ENV !== "production") {
+      console.log("✅ Firebase initialized successfully");
+    }
+  } catch (error) {
+    console.error("❌ Firebase initialization error:", error);
   }
+} else if (typeof window !== "undefined" && !hasRequiredConfig && process.env.NODE_ENV !== "production") {
+  console.info("[Firebase] Client config missing. Skipping initialization for this session.");
 }
 
 export { firebaseApp, auth, db, analytics };

@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from "react";
 
 interface VIIMAnimationProps {
   state: "idle" | "listening" | "speaking" | "recording" | "processing";
-  size?: "sm" | "md" | "lg";
+  size?: "xxs" | "xs" | "sm" | "md" | "lg";
   className?: string;
   container?: "circle" | "square" | "none";
   visualStyle?: "bars" | "waves" | "blob" | "radial" | "canvas" | "particles";
@@ -37,6 +37,8 @@ export default function VIIMAnimation({
 
   // Size configurations
   const sizeConfig = {
+    xxs: { barCount: 8, height: 50, barWidth: 2, gap: 2, containerSize: 120 },
+    xs: { barCount: 12, height: 70, barWidth: 3, gap: 3, containerSize: 180 },
     sm: { barCount: 20, height: 100, barWidth: 4, gap: 4, containerSize: 280 },
     md: { barCount: 30, height: 150, barWidth: 6, gap: 6, containerSize: 380 },
     lg: { barCount: 40, height: 200, barWidth: 8, gap: 8, containerSize: 480 }

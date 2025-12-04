@@ -13,9 +13,6 @@ export function GreetingBubble({ message = "Hello, how may I help?", visible }: 
       <div className="inline-block bg-white border border-gray-200 rounded-2xl rounded-tl-none px-4 py-3 shadow-sm max-w-[85%]">
         <p className="text-gray-900 text-sm leading-relaxed">{message}</p>
       </div>
-      <p className="text-xs text-gray-400 mt-2 ml-4">
-        text if voice is turned off or phone is silent mode
-      </p>
     </div>
   );
 }
